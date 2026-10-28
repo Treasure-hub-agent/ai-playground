@@ -69,6 +69,19 @@ npx ai-playground             # 起服务并托管完整网页（含音乐）
 
 > 还没发布到 npm registry——别人拿到这个 tarball 就能在自己机器上跑。
 
+### 方式 D：在 DeepSeek Harness 里一键开（插件）
+
+如果你用 DSH，装个插件就行——**插件自带本体，装完点开即玩**，不用自己 clone、装依赖或配命令：
+
+```bash
+dsh plugin --profile desktop add dsh-whale-game
+```
+
+装完重启 DSH，左侧栏底部一条 🎮，点开是一枚气泡：起停游戏厅、打开网页、复制 MCP 配置都在那里。
+
+仓库：[**Treasure-hub-agent/dsh-whale-game**](https://github.com/Treasure-hub-agent/dsh-whale-game)。
+插件只负责「起停 + 入口」，游戏本体仍然来自本仓库（插件里打了一份构建产物，方便开箱即用）；两边独立发版，改规则/加游戏在这里改即可。
+
 **环境要求**：Node.js 22+、pnpm 9+（实测 Node 24 / pnpm 11）。
 
 ### 房间会落盘
