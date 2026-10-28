@@ -1,0 +1,19 @@
+/* Dialog 语义层的补充样式。
+   布局（居中、遮罩、圆角、尺寸）由调用方传进来的类名负责：
+   邀请弹窗复用 .modal-backdrop / .modal-shell，结算浮层复用 .result-overlay / .result-card。
+   这里只管键盘焦点可见性与背景滚动锁定，避免和那两个模块的样式打架。 */
+
+.dialog-shell:focus {
+  /* 容器只在「里面没有任何可聚焦元素」时才被聚焦，此时用轮廓标记反而怪，直接隐藏 */
+  outline: none;
+}
+
+.dialog-shell:focus-visible {
+  outline: 2px solid var(--ink-2, #3a4150);
+  outline-offset: 6px;
+}
+
+/* 弹窗打开时锁住背后页面的滚动（:has 在目标浏览器已普遍支持） */
+body:has([role='dialog'][aria-modal='true']) {
+  overflow: hidden;
+}

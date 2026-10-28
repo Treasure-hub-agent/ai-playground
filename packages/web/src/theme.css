@@ -1,0 +1,3483 @@
+/* ============================================================================
+   theme.css —— 精致化设计层
+   叠在 styles.css 之后：统一设计变量、去掉「贴纸/描边/emoji」卡通语汇，
+   给大厅、牌桌、弹窗补齐动效与操作反馈。
+   ========================================================================== */
+
+:root {
+  --ink: #171a21;
+  --ink-2: #3a4150;
+  /* 原毛病：#6f7686 在 paper 只有 4.10:1、surface-2 4.33:1（12–13px 二级正文大量使用），不达 AA；
+     而且 ink-4 压深之后层级反转（ink-4 比 ink-3 还深）。本轮压到 #5f6675：
+     白底 5.76:1 / paper 5.19:1 / surface-2 5.47:1，重新回到 ink-2 > ink-3 > ink-4 的深浅顺序。 */
+  --ink-3: #5f6675;
+  /* 原毛病：#9aa1ae 仅 2.6:1 → #79808d 3.97:1，均不到 AA 的 4.5。本轮压到 #666d7a：
+     白底 5.21:1 / paper 4.69:1 / surface-2 4.95:1（WCAG 2.1 脚本复算）；paper 是最严的底。 */
+  --ink-4: #666d7a;
+  --line: rgba(23, 26, 33, 0.09);
+  --line-strong: rgba(23, 26, 33, 0.16);
+  --paper: #f4f3ef;
+  --surface: #ffffff;
+  --surface-2: #faf9f6;
+  --accent-ink: #171a21;
+  --amber: #c08a2e;
+  /* 新增：amber 小字/状态字专用深色档。#c08a2e 白底只有 3.04:1，此值白底 5.63:1 / paper 5.07:1 / surface-2 5.35:1；
+     纯装饰与大图标继续用 --amber，只有 ≤12.5px 的文字换 --amber-ink。 */
+  --amber-ink: #8a5f14;
+  --amber-soft: #f7ecd6;
+  --teal: #2f837c;
+  --plum: #8a5cc4;
+  --danger: #b4452f;
+
+  --radius-sm: 10px;
+  --radius: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 26px;
+
+  --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 1px rgba(16, 24, 40, 0.03);
+  --shadow-2: 0 1px 2px rgba(16, 24, 40, 0.05), 0 18px 40px -26px rgba(16, 24, 40, 0.45);
+  --shadow-3: 0 2px 6px rgba(16, 24, 40, 0.06), 0 32px 64px -32px rgba(16, 24, 40, 0.5);
+
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
+}
+
+/* ── 基础排版 ─────────────────────────────────────────────────────────── */
+
+body {
+  background:
+    radial-gradient(1200px 600px at 12% -8%, rgba(192, 138, 46, 0.09), transparent 60%),
+    radial-gradient(900px 520px at 100% 0%, rgba(47, 131, 124, 0.07), transparent 55%),
+    var(--paper);
+  color: var(--ink);
+  font-family:
+    'Inter', 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', system-ui, -apple-system,
+    sans-serif;
+  font-size: 15px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.015em;
+  font-weight: 640;
+  color: var(--ink);
+}
+
+a {
+  color: inherit;
+}
+
+code,
+pre {
+  font-family: 'JetBrains Mono', 'Cascadia Code', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+:focus-visible {
+  outline: 2px solid rgba(23, 26, 33, 0.55);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* 装饰层：卡通天空/彩旗/云朵在精致化版本里退场 */
+.sky-decor,
+.bunting,
+.cloud,
+.sun,
+.sky-stars,
+.sparkles,
+.whale-bubbles,
+.confetti,
+.result-rays {
+  display: none !important;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 0 24px;
+}
+
+/* ── 按钮 ─────────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 560;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    transform var(--dur-1) var(--ease),
+    box-shadow var(--dur-2) var(--ease),
+    background var(--dur-2) var(--ease),
+    border-color var(--dur-2) var(--ease),
+    color var(--dur-2) var(--ease);
+  box-shadow: var(--shadow-1);
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-2);
+  border-color: var(--line-strong);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
+  box-shadow: var(--shadow-1);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+.btn-primary {
+  background: var(--accent-ink);
+  border-color: var(--accent-ink);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #232834;
+  border-color: #232834;
+}
+
+.btn-quiet,
+.btn-ghost {
+  background: transparent;
+  border-color: var(--line-strong);
+  color: var(--ink-2);
+  box-shadow: none;
+}
+
+.btn-quiet:hover:not(:disabled),
+.btn-ghost:hover:not(:disabled) {
+  background: rgba(23, 26, 33, 0.04);
+  color: var(--ink);
+}
+
+.btn-lg {
+  height: 46px;
+  padding: 0 22px;
+  border-radius: 14px;
+  font-size: 15px;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.btn-mini {
+  height: 30px;
+  padding: 0 12px;
+  font-size: 12.5px;
+  border-radius: 9px;
+}
+
+.btn-send {
+  height: 38px;
+  min-width: 68px;
+  border-radius: 10px;
+  background: var(--accent-ink);
+  border-color: var(--accent-ink);
+  color: #fff;
+  font-weight: 560;
+}
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-3);
+  cursor: pointer;
+  transition:
+    background var(--dur-2) var(--ease),
+    color var(--dur-2) var(--ease);
+}
+
+.icon-btn:hover {
+  background: rgba(23, 26, 33, 0.05);
+  color: var(--ink);
+}
+
+/* ── 顶栏 ─────────────────────────────────────────────────────────────── */
+
+.site-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 22px 4px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.brand-whale {
+  width: 30px !important;
+  height: 30px !important;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  font-size: 15px;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.brand-text em {
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 520;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.site-nav a {
+  text-decoration: none;
+  position: relative;
+  transition: color var(--dur-2) var(--ease);
+}
+
+.site-nav a:hover {
+  color: var(--ink);
+}
+
+.site-nav a::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 100%;
+  bottom: -4px;
+  height: 1px;
+  background: var(--ink);
+  transition: right var(--dur-2) var(--ease);
+}
+
+.site-nav a:hover::after {
+  right: 0;
+}
+
+.site-nav-sep {
+  width: 1px;
+  height: 14px;
+  background: var(--line-strong);
+}
+
+.site-version {
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-4);
+}
+
+/* ── 大厅 Hero ────────────────────────────────────────────────────────── */
+
+.lobby-page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-bottom: 40px;
+}
+
+.lobby-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+  gap: 56px;
+  align-items: center;
+  padding: 56px 4px 52px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 14px;
+  font-size: 11.5px;
+  font-weight: 560;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+
+.lobby-hero h1 {
+  margin: 0 0 18px;
+  font-size: clamp(32px, 4.1vw, 50px);
+  line-height: 1.14;
+  font-weight: 660;
+  letter-spacing: -0.025em;
+}
+
+.lede {
+  margin: 0 0 26px;
+  max-width: 46ch;
+  font-size: 15.5px;
+  line-height: 1.8;
+  color: var(--ink-2);
+}
+
+.hero-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 34px;
+}
+
+.hero-cta .btn {
+  text-decoration: none;
+}
+
+.hero-stats {
+  display: flex;
+  gap: 36px;
+  margin: 0;
+  padding: 0;
+}
+
+.hero-stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hero-stats dt {
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+
+.hero-stats dd {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 620;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hero 右侧：牌桌预览卡（纯 CSS，替代原来的卡通插画） */
+.hero-preview {
+  display: flex;
+  justify-content: center;
+}
+
+.preview-card {
+  width: min(100%, 380px);
+  padding: 18px;
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-3);
+}
+
+.preview-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.preview-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--teal);
+  box-shadow: 0 0 0 3px rgba(47, 131, 124, 0.14);
+}
+
+.preview-title {
+  letter-spacing: 0.02em;
+}
+
+.preview-round {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview-board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 16px 0;
+}
+
+.preview-cell {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1 / 0.86;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-4);
+}
+
+.preview-coin {
+  background: var(--amber-soft);
+  border-color: rgba(192, 138, 46, 0.28);
+  color: var(--amber);
+}
+
+.preview-bomb {
+  background: rgba(180, 69, 47, 0.08);
+  border-color: rgba(180, 69, 47, 0.22);
+  color: var(--danger);
+}
+
+.preview-taken {
+  background: transparent;
+  border-style: dashed;
+  color: transparent;
+}
+
+.preview-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview-you {
+  font-weight: 620;
+}
+
+.preview-vs {
+  color: var(--ink-4);
+}
+
+.preview-agent {
+  font-weight: 620;
+  color: var(--plum);
+}
+
+/* ── 游戏库 ───────────────────────────────────────────────────────────── */
+
+.catalog {
+  padding: 8px 4px 48px;
+}
+
+.catalog-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 22px;
+}
+
+.catalog-head h2 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+.catalog-head .eyebrow {
+  margin-bottom: 8px;
+}
+
+.catalog-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.filter-group {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 11px;
+  background: rgba(23, 26, 33, 0.045);
+}
+
+.filter-chip {
+  height: 28px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  font-weight: 540;
+  cursor: pointer;
+  transition:
+    background var(--dur-2) var(--ease),
+    color var(--dur-2) var(--ease),
+    box-shadow var(--dur-2) var(--ease);
+}
+
+.filter-chip:hover {
+  color: var(--ink);
+}
+
+.filter-chip.is-active {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-1);
+}
+
+.game-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(296px, 1fr));
+  gap: 16px;
+}
+
+.game-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-1);
+  transition:
+    transform var(--dur-2) var(--ease),
+    box-shadow var(--dur-2) var(--ease),
+    border-color var(--dur-2) var(--ease);
+  animation: card-in var(--dur-3) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+.game-card.is-playable:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-2);
+  border-color: var(--line-strong);
+}
+
+.game-card.is-wip {
+  background: var(--surface-2);
+  opacity: 0.82;
+}
+
+.game-card.is-skeleton {
+  min-height: 220px;
+}
+
+.skeleton-row {
+  height: 10px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(23, 26, 33, 0.06), rgba(23, 26, 33, 0.11), rgba(23, 26, 33, 0.06));
+  background-size: 200% 100%;
+  animation: skeleton 1.4s linear infinite;
+}
+
+.skeleton-row.wide {
+  width: 70%;
+  height: 18px;
+}
+
+.game-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.game-glyph {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 13px;
+  color: var(--accent, var(--ink));
+  background: color-mix(in srgb, var(--accent, var(--ink)) 10%, #fff);
+  border: 1px solid color-mix(in srgb, var(--accent, var(--ink)) 22%, transparent);
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 560;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+}
+
+.status-badge i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-badge.is-live {
+  color: var(--teal);
+  background: rgba(47, 131, 124, 0.1);
+  border-color: rgba(47, 131, 124, 0.22);
+}
+
+.status-badge.is-wip {
+  color: var(--ink-3);
+  background: rgba(23, 26, 33, 0.055);
+  border-color: var(--line);
+}
+
+.game-name {
+  margin: 2px 0 0;
+  font-size: 19px;
+  font-weight: 630;
+  letter-spacing: -0.015em;
+}
+
+.game-tagline {
+  margin: 0;
+  min-height: 42px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink-3);
+}
+
+.game-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.game-meta li + li::before {
+  content: '·';
+  margin: 0 8px;
+  color: var(--ink-4);
+}
+
+.game-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.game-tags span {
+  padding: 3px 9px;
+  border-radius: 7px;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+
+.game-rules summary {
+  font-size: 12.5px;
+  color: var(--ink-3);
+  cursor: pointer;
+  list-style: none;
+  width: fit-content;
+  border-bottom: 1px dashed var(--line-strong);
+  transition: color var(--dur-2) var(--ease);
+}
+
+.game-rules summary::-webkit-details-marker {
+  display: none;
+}
+
+.game-rules summary:hover {
+  color: var(--ink);
+}
+
+.game-rules pre {
+  margin: 10px 0 0;
+  max-height: 200px;
+  overflow: auto;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+}
+
+.game-actions {
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+.game-hint {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-4);
+  text-align: center;
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-1);
+}
+
+.notice h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.notice p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.notice-error {
+  border-color: rgba(180, 69, 47, 0.28);
+  background: rgba(180, 69, 47, 0.04);
+}
+
+.inline-error {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--danger);
+}
+
+/* ── 三步说明 ─────────────────────────────────────────────────────────── */
+
+.how {
+  padding: 40px 4px 32px;
+  border-top: 1px solid var(--line);
+}
+
+.how-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.how-list li {
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-1);
+}
+
+.how-num {
+  display: inline-block;
+  margin-bottom: 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+
+.how-list h3 {
+  margin: 0 0 6px;
+  font-size: 15.5px;
+}
+
+.how-list p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink-3);
+}
+
+.how-list code {
+  font-size: 11.5px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(23, 26, 33, 0.06);
+}
+
+.lobby-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 22px 4px 0;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--ink-4);
+}
+
+.muted {
+  color: var(--ink-4);
+}
+
+/* ── 牌桌（对局页）────────────────────────────────────────────────────── */
+
+.room-page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 18px 4px 40px;
+}
+
+.room-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  margin-bottom: 18px;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-1);
+  backdrop-filter: blur(8px);
+  position: sticky;
+  top: 10px;
+  z-index: 20;
+}
+
+.brand-small {
+  font-size: 13.5px;
+  font-weight: 620;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.room-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.room-code {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 7px;
+  background: rgba(23, 26, 33, 0.05);
+  /* 原毛病：旧 styles.css 的 2px 实心黑描边一直在，房间号像被 focus 了（N1）；改成 1px 淡边 */
+  border: 1px solid var(--line);
+}
+
+.seat-pill {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  border: 1px solid var(--line);
+}
+
+.room-header-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.game-layout {
+  display: grid;
+  /* 牌桌给得更宽：快艇骰子的计分板要两栏并排，聊天区 300px 就够 */
+  grid-template-columns: minmax(0, 1.95fr) minmax(300px, 0.82fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.play-column {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* grid/flex 子项的 min-width 默认是 auto（= min-content），
+   聊天面板内容一宽就会把整列撑开、把棋盘挤扁，所以显式归零。 */
+.play-column,
+.side-column,
+.chat-panel,
+.board-wrap {
+  min-width: 0;
+}
+
+.side-column {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.scorebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-1);
+}
+
+.player-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.player-avatar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+
+.player-tag {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-4);
+}
+
+.player-name {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.player-score-wrap {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  margin-left: 4px;
+}
+
+.player-score {
+  font-size: 26px;
+  font-weight: 660;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  transition: color var(--dur-2) var(--ease);
+}
+
+.player-score-unit {
+  font-size: 11.5px;
+  color: var(--ink-4);
+}
+
+.round-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.round-chip {
+  font-size: 12px;
+  font-weight: 560;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.round-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.round-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(23, 26, 33, 0.14);
+  transition: background var(--dur-2) var(--ease);
+}
+
+.round-dots i.is-done {
+  background: rgba(23, 26, 33, 0.42);
+}
+
+.board {
+  padding: 18px;
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-2);
+  position: relative;
+}
+
+.board-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.board-cell {
+  position: relative;
+  aspect-ratio: 1 / 0.92;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  cursor: default;
+  transition:
+    transform var(--dur-1) var(--ease),
+    box-shadow var(--dur-2) var(--ease),
+    border-color var(--dur-2) var(--ease),
+    background var(--dur-2) var(--ease);
+}
+
+.board-cell.is-interactive {
+  cursor: pointer;
+}
+
+.board-cell.is-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-2);
+  border-color: var(--line-strong);
+  background: #fff;
+}
+
+.board-cell.is-interactive:active {
+  transform: translateY(0) scale(0.985);
+}
+
+.board-cell.is-legal::after {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: calc(var(--radius) - 6px);
+  border: 1px dashed rgba(23, 26, 33, 0.12);
+  pointer-events: none;
+}
+
+.board-cell.is-interactive.is-legal::after {
+  border-color: rgba(192, 138, 46, 0.4);
+}
+
+.cell-inner {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.cell-face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.cell-face-coin {
+  color: var(--amber);
+}
+
+.cell-face-bomb {
+  color: var(--danger);
+}
+
+.cell-face-empty {
+  color: var(--ink-4);
+}
+
+.cell-face-taken {
+  color: var(--ink-4);
+}
+
+.coin-emoji,
+.bomb-emoji {
+  display: none; /* emoji 退场，改用 SVG 图标 */
+}
+
+.coin-value,
+.bomb-value {
+  font-size: 12.5px;
+  font-weight: 620;
+  font-variant-numeric: tabular-nums;
+}
+
+.empty-mark {
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  color: var(--ink-4);
+}
+
+.taken-mark {
+  font-size: 14px;
+  color: var(--ink-4);
+}
+
+.taken-text {
+  font-size: 10.5px;
+  color: var(--ink-4);
+}
+
+.board-cell.is-picked-you {
+  border-color: rgba(47, 131, 124, 0.5);
+  box-shadow: 0 0 0 3px rgba(47, 131, 124, 0.12);
+}
+
+.board-cell.is-picked-agent {
+  border-color: rgba(138, 92, 196, 0.5);
+  box-shadow: 0 0 0 3px rgba(138, 92, 196, 0.12);
+}
+
+.board-cell.is-picked-collision {
+  border-color: rgba(180, 69, 47, 0.5);
+  animation: shake 320ms var(--ease);
+}
+
+.pending-chip {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  /* 原毛病：旧 styles.css 还写着 bottom:6px，与这里的 top 同时生效 → 徽章被拉成整格高竖条（S3）。
+     本轮已把旧块删掉，这里仍显式写 bottom:auto 防再犯（与 .pick-badges 的 top:auto 同一思路）。 */
+  bottom: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  /* 旧 styles.css 块删掉后字重没了继承来源；原 900 偏重，统一到 620（和 .pick-badge 一族一致） */
+  font-weight: 620;
+  color: var(--ink-2);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--line);
+  /* 旧块删除后把入场 pop-in 留在这儿，避免徽章从「弹出」退化成「闪现」 */
+  animation: pop-in 180ms var(--ease-out);
+}
+
+.pick-badges {
+  position: absolute;
+  /* 旧样式只写了 top，这里补 bottom 会上下同时生效 → 徽章被拉成整格高竖条 */
+  top: auto;
+  bottom: 6px;
+  left: 6px;
+  right: 6px;
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+.pick-badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 560;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  /* 清掉旧版的 2px 黑描边 + 贴纸投影 */
+  box-shadow: none;
+  animation: none;
+}
+
+.pick-badge-you {
+  color: var(--teal);
+}
+
+.pick-badge-agent {
+  color: var(--plum);
+}
+
+.collision-burst {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  animation: burst 420ms var(--ease-out) both;
+}
+
+.reveal-flash {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: flash 420ms var(--ease-out) both;
+}
+
+.reveal-flash.is-collision {
+  animation: flash-danger 420ms var(--ease-out) both;
+}
+
+/* ── 聊天气泡 ─────────────────────────────────────────────────────────── */
+
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+  min-height: 320px;
+}
+
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.panel-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 620;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.panel-sub {
+  font-size: 11.5px;
+  color: var(--ink-4);
+}
+
+.chat-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 300px;
+}
+
+.chat-empty {
+  margin: auto;
+  text-align: center;
+  color: var(--ink-4);
+  font-size: 12.5px;
+}
+
+.chat-empty-emoji {
+  display: none;
+}
+
+.chat-empty p {
+  margin: 2px 0;
+}
+
+.chat-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.chat-row.is-mine {
+  flex-direction: row-reverse;
+}
+
+.chat-avatar {
+  display: none; /* 气泡上已有署名，去掉卡通头像 */
+}
+
+.chat-bubble {
+  max-width: 78%;
+  padding: 8px 11px;
+  border-radius: 13px;
+  font-size: 13px;
+  line-height: 1.55;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  animation: bubble-in var(--dur-2) var(--ease-out) both;
+}
+
+.is-mine .chat-bubble {
+  background: var(--accent-ink);
+  border-color: var(--accent-ink);
+  color: #fff;
+}
+
+.chat-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 2px;
+  font-size: 10.5px;
+  color: var(--ink-4);
+}
+
+.is-mine .chat-meta {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.chat-meta b {
+  font-weight: 560;
+}
+
+.chat-meta time {
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-bubble p {
+  margin: 0;
+}
+
+.quick-phrases {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 16px 10px;
+}
+
+.quick-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  font-size: 11.5px;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition:
+    background var(--dur-2) var(--ease),
+    color var(--dur-2) var(--ease),
+    transform var(--dur-1) var(--ease);
+}
+
+.quick-chip:hover:not(:disabled) {
+  background: #fff;
+  color: var(--ink);
+  transform: translateY(-1px);
+}
+
+.quick-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chat-input-row {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.chat-input {
+  flex: 1;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  font-size: 13px;
+  color: var(--ink);
+  transition:
+    border-color var(--dur-2) var(--ease),
+    background var(--dur-2) var(--ease);
+}
+
+.chat-input:focus {
+  outline: none;
+  border-color: var(--line-strong);
+  background: #fff;
+}
+
+/* ── 弹窗 ─────────────────────────────────────────────────────────────── */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(23, 26, 33, 0.36);
+  backdrop-filter: blur(6px);
+  animation: fade-in var(--dur-2) var(--ease-out) both;
+}
+
+.modal-shell {
+  width: min(560px, 100%);
+  max-height: min(86vh, 780px);
+  overflow-y: auto;
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-3);
+  animation: modal-in var(--dur-3) var(--ease-out) both;
+}
+
+.invite-card {
+  padding: 24px;
+}
+
+.invite-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.invite-badge {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+
+.invite-head h2 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.invite-head p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.invite-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: background var(--dur-2) var(--ease);
+}
+
+.invite-close:hover {
+  background: rgba(23, 26, 33, 0.06);
+}
+
+.field {
+  margin-bottom: 14px;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-4);
+}
+
+.roomcode-row,
+.copy-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.roomcode-block,
+.copy-line > code,
+.copy-line > span {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.roomcode-block {
+  font-size: 15px;
+  font-weight: 620;
+  letter-spacing: 0.16em;
+  color: var(--ink);
+}
+
+.invite-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0 18px;
+  padding: 0;
+  list-style: none;
+}
+
+.invite-step {
+  display: flex;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.step-num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(23, 26, 33, 0.06);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.mcp-details summary {
+  font-size: 12.5px;
+  color: var(--ink-3);
+  cursor: pointer;
+  list-style: none;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.mcp-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.code-block-wrap {
+  position: relative;
+  margin: 6px 0 0;
+}
+
+.code-block {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: #14171f;
+  color: #e8eaf0;
+  font-size: 11.5px;
+  line-height: 1.7;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.code-copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: #e8eaf0;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.code-copy:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.invite-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.copy-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 80;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(23, 26, 33, 0.92);
+  color: #fff;
+  font-size: 12.5px;
+  animation: toast-in var(--dur-2) var(--ease-out) both;
+}
+
+.field-note {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  color: var(--ink-4);
+}
+
+/* ── 结算浮层 ─────────────────────────────────────────────────────────── */
+
+.result-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(23, 26, 33, 0.4);
+  backdrop-filter: blur(8px);
+  animation: fade-in var(--dur-2) var(--ease-out) both;
+}
+
+.result-card {
+  width: min(420px, 100%);
+  padding: 26px;
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-3);
+  text-align: center;
+  animation: modal-in var(--dur-3) var(--ease-out) both;
+}
+
+.result-avatar {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 10px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+
+.result-title {
+  margin: 0 0 4px;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+.result-subtitle {
+  margin: 0 0 18px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.result-scoreboard {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 16px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  margin-bottom: 14px;
+}
+
+.result-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.result-name {
+  font-size: 11.5px;
+  color: var(--ink-4);
+}
+
+.result-score {
+  font-size: 30px;
+  font-weight: 660;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.result-score.is-win {
+  color: var(--teal);
+}
+
+.result-unit {
+  font-size: 11px;
+  color: var(--ink-4);
+}
+
+.result-colon {
+  font-size: 18px;
+  color: var(--ink-4);
+}
+
+.result-meta {
+  margin: 0 0 18px;
+  font-size: 12px;
+  color: var(--ink-4);
+}
+
+.result-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.result-backdrop {
+  display: none;
+}
+
+/* ── 其它零碎 ─────────────────────────────────────────────────────────── */
+
+.toast-icon {
+  display: none;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  z-index: 80;
+  padding: 9px 15px;
+  border-radius: 999px;
+  background: rgba(23, 26, 33, 0.92);
+  color: #fff;
+  font-size: 12.5px;
+  animation: toast-in var(--dur-2) var(--ease-out) both;
+}
+
+.waiting-card,
+.seat-mismatch-card,
+.room-loading {
+  width: min(420px, 100%);
+  margin: 60px auto;
+  padding: 26px;
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-2);
+  text-align: center;
+}
+
+.waiting-emoji,
+.fatal-emoji,
+.seal-icon {
+  display: none;
+}
+
+.waiting-card h3,
+.seat-mismatch-card h1 {
+  margin: 8px 0 8px;
+  font-size: 19px;
+  letter-spacing: -0.02em;
+}
+
+.waiting-card p,
+.seat-mismatch-card p {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.waiting-actions,
+.seat-mismatch-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.waiting-cover {
+  display: none;
+}
+
+.seal-banner,
+.seal-dots {
+  display: none;
+}
+
+.rules-card {
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.rules-card summary {
+  padding: 13px 16px;
+  font-size: 13px;
+  font-weight: 560;
+  cursor: pointer;
+  list-style: none;
+}
+
+.rules-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.rules-card pre {
+  margin: 0;
+  padding: 0 16px 16px;
+  font-size: 11.5px;
+  line-height: 1.8;
+  color: var(--ink-3);
+  white-space: pre-wrap;
+}
+
+.loading-wave i {
+  background: rgba(23, 26, 33, 0.18);
+}
+
+.hint-spark,
+.room-fatal span,
+.reveal-round,
+.reveal-you,
+.reveal-agent,
+.collision-tag {
+  color: var(--ink-3);
+}
+
+.char-count {
+  font-size: 11px;
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 动效 ─────────────────────────────────────────────────────────────── */
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-3px);
+  }
+  50% {
+    transform: translateX(3px);
+  }
+  75% {
+    transform: translateX(-2px);
+  }
+}
+
+@keyframes burst {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.2);
+  }
+}
+
+@keyframes flash {
+  from {
+    background: rgba(192, 138, 46, 0.16);
+  }
+  to {
+    background: transparent;
+  }
+}
+
+@keyframes flash-danger {
+  from {
+    background: rgba(180, 69, 47, 0.18);
+  }
+  to {
+    background: transparent;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes skeleton {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ── 响应式 ───────────────────────────────────────────────────────────── */
+
+@media (max-width: 1100px) {
+  .lobby-hero {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    padding: 40px 4px 36px;
+  }
+
+  .hero-preview {
+    order: -1;
+    justify-content: flex-start;
+  }
+
+  .preview-card {
+    width: min(100%, 320px);
+  }
+
+  /* 单栏后牌桌与顶栏同宽：清掉 legacy 的 1180 限宽和 0 26px 内缩，
+     宽度完全交给 .room-page（1024 下顶栏与牌桌都是 968，不再左右各空 104，M11）。 */
+  .game-layout {
+    grid-template-columns: 1fr;
+    max-width: none;
+    padding: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    padding: 0 16px;
+  }
+
+  /* 顶栏在窄屏会横向溢出（音量滑块被切、品牌折行），允许换行并收起次要项 */
+  .site-head,
+  .site-nav {
+    flex-wrap: wrap;
+    gap: 8px 10px;
+  }
+
+  .site-version {
+    display: none;
+  }
+
+  .lobby-hero h1 {
+    font-size: 30px;
+  }
+
+  .hero-stats {
+    gap: 22px;
+  }
+
+  .catalog-head,
+  .how {
+    align-items: flex-start;
+  }
+
+  .game-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── 覆盖旧 class 的残留（提高选择器权重，避免卡通样式漏出来） ───────── */
+
+.how-list li {
+  position: relative;
+}
+
+.how-num {
+  position: static;
+  top: auto;
+  right: auto;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--ink-4);
+}
+
+.modal-shell .invite-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-right: 0;
+  margin-bottom: 20px;
+}
+
+.modal-shell .invite-head-text {
+  min-width: 0;
+}
+
+.modal-shell .invite-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  margin-bottom: 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(23, 26, 33, 0.045);
+  font-size: 11px;
+  font-weight: 560;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  color: var(--ink-3);
+  transform: none;
+}
+
+.modal-shell .invite-head h2 {
+  margin: 0 0 6px;
+  font-size: 19px;
+  font-weight: 640;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+}
+
+.modal-shell .invite-head p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-3);
+}
+
+.modal-shell .invite-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink-3);
+  transform: none;
+}
+
+.modal-shell .copy-line input,
+.modal-shell .copy-line .roomcode {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+.modal-shell .copy-line input:focus {
+  outline: none;
+  border-color: var(--line-strong);
+  background: #fff;
+}
+
+.modal-shell .copy-line .roomcode {
+  display: flex;
+  align-items: center;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 14px;
+  font-weight: 620;
+  letter-spacing: 0.14em;
+  background: var(--surface-2);
+}
+
+.modal-shell .step-num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.modal-shell .invite-step p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--ink-3);
+}
+
+.modal-shell .summary-hint {
+  float: right;
+  font-size: 11.5px;
+  color: var(--ink-4);
+}
+
+.modal-shell .invite-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+/* 牌桌页：旧样式里的大描边/贴纸阴影收紧 */
+.room-page .scorebar,
+.room-page .chat-panel,
+.room-page .rules-card,
+.room-page .board {
+  border-width: 1px;
+}
+
+/* ── 牌桌重构后的新组件 ─────────────────────────────────────────────── */
+
+.player-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  transition:
+    background var(--dur-2) var(--ease),
+    border-color var(--dur-2) var(--ease),
+    box-shadow var(--dur-2) var(--ease);
+}
+
+.player-chip.is-active {
+  background: var(--surface-2);
+  border-color: var(--line);
+}
+
+.player-avatar-agent {
+  color: var(--plum);
+}
+
+.player-info .player-name {
+  display: block;
+}
+
+.turn-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.turn-state.is-turn {
+  color: var(--teal);
+}
+
+.turn-state.is-reveal {
+  /* 原毛病：11.5px 状态字用 --amber（白底 3.04:1）看不清；改用深一档的 --amber-ink（5.63:1） */
+  color: var(--amber-ink);
+}
+
+.online-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ink-4);
+}
+
+.online-dot.is-on {
+  background: var(--teal);
+  box-shadow: 0 0 0 3px rgba(47, 131, 124, 0.14);
+}
+
+.online-dot.is-off {
+  background: var(--danger);
+}
+
+.delta-float {
+  /* 旧样式是绝对定位的 2px 黑描边贴纸，会盖住揭示条的分数 —— 全部重置成内联文字 */
+  position: static;
+  top: auto;
+  right: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  margin-left: 2px;
+  font-size: 12.5px;
+  font-weight: 620;
+  font-variant-numeric: tabular-nums;
+  animation: delta-rise 900ms var(--ease-out) both;
+}
+
+.delta-float.is-plus {
+  color: var(--teal);
+}
+
+.delta-float.is-minus {
+  color: var(--danger);
+}
+
+.board-wrap {
+  position: relative;
+}
+
+.board-cover {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  border-radius: var(--radius-xl);
+  background: rgba(244, 243, 239, 0.72);
+  backdrop-filter: blur(3px);
+  animation: fade-in var(--dur-2) var(--ease-out) both;
+}
+
+.board-cover-card {
+  width: min(320px, 100%);
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-2);
+  text-align: center;
+}
+
+.board-cover-card h3 {
+  margin: 0 0 6px;
+  font-size: 15.5px;
+}
+
+.board-cover-card p {
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.board-cover-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.seal-strip,
+.reveal-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-2);
+  font-size: 12px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  animation: strip-in var(--dur-2) var(--ease-out) both;
+}
+
+/* 「已开牌」提示仍在 .board-wrap 内，继续用绝对定位贴在棋盘底部 */
+.seal-strip {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  color: var(--ink-3);
+}
+
+/* 揭示条已由 GameRoom 移到 .board-wrap 外。原毛病：position:absolute + bottom:14px
+   会压住棋盘最后一排，挪出去后还会跟着父级定位跑；改成文档流里的横向 flex 条，上间距 12px。 */
+.reveal-strip {
+  position: static;
+  transform: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 12px;
+  border-radius: var(--radius);
+  white-space: normal;
+  /* 共用的 strip-in 关键帧结尾停在 translate(-50%,0)（给绝对定位居中用的），
+     文档流里会把整条左移半宽 —— 这里换成只淡入、不改 transform 的 fade-in。 */
+  animation: fade-in var(--dur-2) var(--ease-out) both;
+}
+
+.reveal-strip.is-collision {
+  border-color: rgba(180, 69, 47, 0.3);
+}
+
+.reveal-round {
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+
+.reveal-seat {
+  color: var(--ink-2);
+}
+
+.reveal-you {
+  color: var(--teal);
+}
+
+.reveal-agent {
+  color: var(--plum);
+}
+
+.reveal-float {
+  font-weight: 620;
+  font-variant-numeric: tabular-nums;
+}
+
+.reveal-float.is-plus {
+  color: var(--teal);
+}
+
+.reveal-float.is-minus {
+  color: var(--danger);
+}
+
+.collision-tag {
+  color: var(--danger);
+}
+
+.turn-hint {
+  margin: 0;
+  padding: 0 4px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.turn-hint.is-sealed {
+  /* 原毛病：12.5px 提示字用 --amber，对比度不足；换 --amber-ink（白底 5.63:1） */
+  color: var(--amber-ink);
+}
+
+.room-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition:
+    background var(--dur-2) var(--ease),
+    color var(--dur-2) var(--ease);
+}
+
+.room-back:hover {
+  background: rgba(23, 26, 33, 0.05);
+  color: var(--ink);
+}
+
+.conn-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--ink-4);
+}
+
+.conn-dot::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--teal);
+}
+
+.conn-dot.is-off::before {
+  background: var(--danger);
+}
+
+.conn-dot.is-off {
+  color: var(--danger);
+}
+
+.result-badge {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.result-badge.is-win {
+  color: var(--teal);
+  background: rgba(47, 131, 124, 0.1);
+  border: 1px solid rgba(47, 131, 124, 0.24);
+}
+
+.result-badge.is-lose {
+  color: var(--plum);
+  background: rgba(138, 92, 196, 0.1);
+  border: 1px solid rgba(138, 92, 196, 0.24);
+}
+
+.result-badge.is-draw {
+  color: var(--ink-3);
+  background: rgba(23, 26, 33, 0.05);
+  border: 1px solid var(--line);
+}
+
+.result-col.is-winner .result-name {
+  color: var(--ink);
+}
+
+.rules-card ul {
+  margin: 0;
+  padding: 0 16px 16px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rules-card li {
+  position: relative;
+  padding-left: 12px;
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--ink-3);
+}
+
+.rules-card li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--ink-4);
+}
+
+@keyframes delta-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes strip-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* 收紧旧样式的 3px 描边与贴纸阴影（.room-page 作用域提高权重） */
+.room-page .board-wrap {
+  width: min(100%, 520px);
+  /* 牌桌列变宽后，固定宽度的棋盘要在列里居中，不然会贴在左边 */
+  margin-inline: auto;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+}
+
+/* 快艇骰子自带卡片（托盘 + 计分板各是一张卡），不需要外层再套一层白框，
+   而且外层 520px 的固定宽度会把两栏计分板挤扁 —— 这里直接放开。 */
+.room-page .board-wrap.is-plain {
+  width: 100%;
+  max-width: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.room-page .board-wrap.is-shaking {
+  animation: shake 320ms var(--ease);
+}
+
+.room-page .scorebar {
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+
+.scorebar .player-agent:not(.is-active) {
+  background: transparent;
+  border-color: transparent;
+}
+
+.scorebar .player-you:not(.is-active) {
+  background: transparent;
+  border-color: transparent;
+}
+
+.room-page .player-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+
+.room-page .player-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  gap: 1px;
+}
+
+.room-page .player-score-wrap {
+  margin-left: auto;
+}
+
+.room-page .chat-panel {
+  min-height: 360px;
+}
+
+/* Agent 侧旧粉色渐变 / 反向布局在多游戏大厅里显得突兀，统一成中性 */
+.room-page .scorebar .player-agent,
+.room-page .scorebar .player-you {
+  background: transparent;
+  flex-direction: row;
+  text-align: left;
+}
+
+.room-page .scorebar .player-agent.is-active,
+.room-page .scorebar .player-you.is-active {
+  background: var(--surface-2);
+}
+
+.room-page .player-agent .player-info,
+.room-page .player-you .player-info {
+  align-items: flex-start;
+}
+
+.room-page .player-agent .player-score-wrap,
+.room-page .player-you .player-score-wrap {
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.room-page .player-agent .player-score {
+  color: var(--plum);
+}
+
+.room-page .player-you .player-score {
+  color: var(--ink);
+}
+
+.room-page .board-cover {
+  background: rgba(244, 243, 239, 0.5);
+  backdrop-filter: blur(1.5px);
+}
+
+.room-page .turn-state {
+  white-space: nowrap;
+}
+
+/* 棋盘：去掉 2.5px 描边 / 内阴影 / 蓝色光圈，改成克制的卡片质感 */
+.room-page .board-cell {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+
+.room-page .board-cell.is-legal:not(:disabled) {
+  background: var(--surface-2);
+  box-shadow: var(--shadow-1);
+}
+
+.room-page .board-cell.is-interactive:hover:not(:disabled) {
+  background: #fff;
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-2);
+}
+
+.room-page .board-cell.is-pending-you,
+.room-page .board-cell.is-picked-you {
+  box-shadow: 0 0 0 3px rgba(47, 131, 124, 0.14);
+}
+
+.room-page .board-cell.is-picked-agent {
+  box-shadow: 0 0 0 3px rgba(138, 92, 196, 0.14);
+}
+
+.room-page .coin-value,
+.room-page .bomb-value {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 620;
+  font-variant-numeric: tabular-nums;
+}
+
+.room-page .coin-value {
+  /* 原毛病：12.5px「+N」金币数字用 --amber，白底只有 3.04:1；换 --amber-ink（白底 5.63:1） */
+  color: var(--amber-ink);
+}
+
+.room-page .bomb-value {
+  color: var(--danger);
+}
+
+.room-page .cell-face-coin svg,
+.room-page .cell-face-bomb svg {
+  width: 38px;
+  height: 38px;
+}
+
+.room-page .empty-mark,
+.room-page .taken-mark {
+  font-size: 11px;
+  color: var(--ink-4);
+}
+
+.room-page .pending-chip {
+  border: 0;
+  background: rgba(23, 26, 33, 0.06);
+  color: var(--ink-3);
+}
+
+.preview-cell {
+  font-weight: 600;
+}
+
+/* 关掉旧版「呼吸光圈」与 hover 时的「抢！」贴纸 */
+.room-page .board-cell.is-interactive {
+  animation: none;
+}
+
+.room-page .board-cell.is-interactive:hover::after,
+.room-page .board-cell.is-interactive:focus-visible::after {
+  content: none;
+}
+
+.room-page .board-cell.is-interactive:hover,
+.room-page .board-cell.is-interactive:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-2);
+}
+
+/* 可点提示改成「悬停才亮」，避免整盘虚线噪音 */
+.room-page .board-cell.is-legal::after {
+  content: none;
+}
+
+.room-page .board-cell.is-interactive:hover::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: calc(var(--radius) - 6px);
+  border: 1px dashed rgba(192, 138, 46, 0.45);
+  pointer-events: none;
+}
+
+/* ── 四子棋棋盘 ─────────────────────────────────────────────────────── */
+
+.c4-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.c4-drops {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.c4-drop {
+  display: grid;
+  place-items: center;
+  height: 30px;
+  border-radius: 10px;
+  border: 1px dashed var(--line-strong);
+  background: var(--surface-2);
+  color: var(--ink-4);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background var(--dur-2) var(--ease),
+    color var(--dur-2) var(--ease),
+    border-color var(--dur-2) var(--ease),
+    transform var(--dur-1) var(--ease);
+}
+
+.c4-drop.is-legal {
+  border-style: solid;
+  border-color: rgba(47, 131, 124, 0.35);
+  background: rgba(47, 131, 124, 0.07);
+  color: var(--teal);
+}
+
+.c4-drop.is-legal:hover {
+  background: rgba(47, 131, 124, 0.14);
+  transform: translateY(-1px);
+}
+
+.c4-drop:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.c4-board {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #eef2f7 0%, #e5eaf2 100%);
+  border: 1px solid rgba(23, 26, 33, 0.06);
+}
+
+.c4-cell {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 42%, #ffffff 0%, #e2e8f0 72%);
+  box-shadow: inset 0 1px 2px rgba(16, 24, 40, 0.1);
+}
+
+.c4-disc {
+  width: 78%;
+  height: 78%;
+  border-radius: 50%;
+  background: transparent;
+  transition: transform var(--dur-2) var(--ease);
+}
+
+.c4-cell.is-p0 .c4-disc {
+  background: linear-gradient(180deg, #4aa89f 0%, #2f837c 100%);
+  box-shadow: 0 2px 6px -2px rgba(47, 131, 124, 0.55);
+}
+
+.c4-cell.is-p1 .c4-disc {
+  background: linear-gradient(180deg, #a274d8 0%, #8a5cc4 100%);
+  box-shadow: 0 2px 6px -2px rgba(138, 92, 196, 0.55);
+}
+
+.c4-cell.is-last .c4-disc {
+  animation: disc-drop 260ms var(--ease-out);
+}
+
+.c4-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  color: var(--ink-4);
+}
+
+.c4-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.c4-dot.is-p0 {
+  background: #2f837c;
+}
+
+.c4-dot.is-p1 {
+  background: #8a5cc4;
+  margin-left: 8px;
+}
+
+@keyframes disc-drop {
+  from {
+    transform: translateY(-18px) scale(0.9);
+    opacity: 0.4;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .c4-drops,
+  .c4-board {
+    gap: 6px;
+  }
+
+  .c4-drop {
+    height: 26px;
+  }
+}
+
+/* ── 弹窗动效修正 ─────────────────────────────────────────────────────
+   旧实现：背板淡入 0.18s + 卡片 pop-in 0.24s + 外壳白底，导致开桌瞬间
+   能先看到一块白色背板、背板还没铺满。现在：背板立即铺满，只让卡片动。
+   ─────────────────────────────────────────────────────────────────── */
+
+.modal-backdrop {
+  animation: none;
+  background: rgba(23, 26, 33, 0.42);
+  backdrop-filter: blur(6px);
+}
+
+body:has(.modal-backdrop) {
+  overflow: hidden;
+}
+
+.modal-backdrop .modal-shell {
+  width: min(560px, 100%);
+  max-height: min(88vh, 820px);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  border-radius: var(--radius-xl);
+  overflow: visible;
+  animation: modal-in var(--dur-3) var(--ease-out) both;
+}
+
+.modal-backdrop .invite-card {
+  animation: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-3);
+  padding: 24px;
+  max-height: min(88vh, 820px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+/* 弹窗打开时，底部操作区始终贴着卡片底部（内容长时可滚） */
+.modal-backdrop .invite-actions {
+  position: sticky;
+  bottom: -24px;
+  margin: 18px -24px -24px;
+  padding: 14px 24px 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, var(--surface) 32%);
+}
+
+/* ── 快艇骰子（yacht）─────────────────────────────────────────────────
+   骰子托盘走「暖纸 + 内光」质感（不是玩具贴纸），计分板走紧凑数字表格。
+   3D 骰子画在 canvas 上，交互热区是叠在上面的透明按钮（对齐用投影坐标算）。
+   ─────────────────────────────────────────────────────────────────── */
+
+.yacht-board {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 托盘 */
+
+.y-tray {
+  position: relative;
+  padding: 10px 12px 12px;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(120% 90% at 50% -25%, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0) 62%),
+    linear-gradient(180deg, #fbf8f1 0%, #f0e8d8 100%);
+  box-shadow: var(--shadow-2), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.y-dice-slot {
+  position: relative;
+  min-height: 158px;
+  border-radius: var(--radius-lg);
+}
+
+/* 正面视角没有投影，加一层很淡的"落影"把骰子压在地面上，不然会飘 */
+.y-dice-slot::after {
+  content: '';
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: 16%;
+  height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(64, 50, 30, 0.14), rgba(64, 50, 30, 0) 72%);
+  filter: blur(3px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.dice-tray-3d,
+.dice-row {
+  position: relative;
+  z-index: 1;
+}
+
+.y-veil {
+  position: absolute;
+  inset: 0;
+  /* 必须盖在 3D canvas 之上，否则未掷骰的提示被骰盘吃掉 */
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, rgba(251, 248, 241, 0.96), rgba(240, 232, 216, 0.98));
+  color: var(--ink-2);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  animation: fade-in var(--dur-3) var(--ease-out) both;
+}
+
+.y-tray-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+  padding: 0 2px;
+}
+
+.y-tray-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.y-rolls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.y-roll-pip {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(23, 26, 33, 0.13);
+  transition: background var(--dur-2) var(--ease);
+}
+
+.y-roll-pip.is-on {
+  background: var(--amber);
+  box-shadow: 0 0 0 3px rgba(192, 138, 46, 0.14);
+}
+
+.y-rolls-text {
+  margin-left: 4px;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.y-held-text {
+  font-size: 11.5px;
+  color: var(--ink-4);
+  min-height: 15px;
+}
+
+.y-roll-btn {
+  min-width: 134px;
+}
+
+/* 3D 托盘：canvas + 不可见的点击热区 */
+
+.dice-tray-3d {
+  position: relative;
+  width: 100%;
+  min-height: 158px;
+  height: 100%;
+}
+
+.dice-canvas {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.dice-canvas canvas {
+  display: block;
+}
+
+.dice-hit-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.dice-hit {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 18px;
+  /* 宽度由归一化投影给（百分比），高度靠 1:1 正方形跟随，永不错位 */
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  cursor: default;
+  transition: transform var(--dur-2) var(--ease);
+}
+
+.dice-hit:not(:disabled) {
+  cursor: pointer;
+}
+
+.dice-hit:not(:disabled):hover {
+  transform: translate(-50%, -50%) scale(1.03);
+}
+
+.dice-hit-ring {
+  position: absolute;
+  inset: -7%;
+  border-radius: 20px;
+  border: 1.5px dashed transparent;
+  transition:
+    border-color var(--dur-2) var(--ease),
+    background var(--dur-2) var(--ease);
+}
+
+.dice-hit:not(:disabled):hover .dice-hit-ring {
+  border-color: rgba(192, 138, 46, 0.5);
+  background: rgba(192, 138, 46, 0.07);
+}
+
+.dice-hit.is-held .dice-hit-ring {
+  border-style: solid;
+  border-color: rgba(192, 138, 46, 0.75);
+  background: rgba(192, 138, 46, 0.1);
+}
+
+.dice-hit-pin {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%) scale(0.9);
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--amber);
+  color: #fff;
+  font-size: 10px;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+  opacity: 0;
+  transition:
+    opacity var(--dur-2) var(--ease),
+    transform var(--dur-2) var(--ease);
+}
+
+.dice-hit.is-held .dice-hit-pin {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+/* 平面骰子（WebGL 不可用 / 懒加载期间） */
+
+/* 原毛病：flex-wrap 让 5 颗骰子在 412 下折成 4+1，遮罩文字被夹在中间（M10）；
+   改成五等分 grid 强制一行五颗，骰子仍各自居中，最窄也只会压缩间隙不会换行。
+   width:fit-content 让宽屏保持原来的紧凑 58px 骰距，不被 1fr 拉散。 */
+.dice-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: center;
+  justify-items: center;
+  gap: 12px;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  padding: 34px 8px 28px;
+}
+
+.dice-row-item {
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: default;
+  transition: transform var(--dur-2) var(--ease);
+}
+
+.dice-row.is-interactive .dice-row-item {
+  cursor: pointer;
+}
+
+.dice-row-item:hover:not(:disabled) {
+  transform: translateY(-3px);
+}
+
+.dice-row-item.is-held {
+  transform: translateY(-7px);
+}
+
+.dice-row-item:disabled {
+  opacity: 1;
+}
+
+.dice-row-pin {
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--amber);
+  color: #fff;
+  font-size: 10px;
+  line-height: 1.4;
+  opacity: 0;
+  transition: opacity var(--dur-2) var(--ease);
+}
+
+.dice-row-item.is-held .dice-row-pin {
+  opacity: 1;
+}
+
+/* CSS 画出来的骰面 */
+
+.die-face {
+  --die-size: 58px;
+  display: block;
+  width: var(--die-size);
+  height: var(--die-size);
+  border-radius: calc(var(--die-size) * 0.22);
+  border: 1px solid rgba(120, 96, 64, 0.14);
+  background: linear-gradient(160deg, #fffdf8 0%, #f6efe1 62%, #e9dfcb 100%);
+  box-shadow:
+    0 8px 16px -10px rgba(60, 48, 28, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 2px rgba(120, 96, 64, 0.14);
+  transition: box-shadow var(--dur-2) var(--ease);
+}
+
+.die-face.is-held {
+  box-shadow:
+    0 0 0 2px var(--amber),
+    0 12px 20px -12px rgba(60, 48, 28, 0.6);
+}
+
+.die-face.is-blank {
+  opacity: 0.5;
+}
+
+.die-face-grid {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  width: 100%;
+  height: 100%;
+  padding: calc(var(--die-size) * 0.13);
+}
+
+.die-pip {
+  place-self: center;
+  width: 60%;
+  height: 60%;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.die-pip.is-on {
+  background: radial-gradient(circle at 35% 30%, #4d5a75, #1d2431 72%);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.25),
+    0 1px 1px rgba(0, 0, 0, 0.18);
+}
+
+/* 计分板 */
+
+.y-panel {
+  padding: 14px 14px 8px;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+
+.y-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.y-panel-title {
+  font-size: 13.5px;
+  font-weight: 620;
+  letter-spacing: 0.02em;
+}
+
+/* 界面还没接上时的占位 */
+
+.board-loading {
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  min-height: 240px;
+  padding: 24px;
+  border-radius: var(--radius-xl);
+  border: 1px dashed var(--line-strong);
+  background: var(--surface-2);
+  color: var(--ink-3);
+  font-size: 13px;
+  text-align: center;
+}
+
+.board-loading small {
+  color: var(--ink-4);
+  font-size: 11.5px;
+}
+
+@media (max-width: 900px) {
+  .y-dice-slot,
+  .dice-tray-3d {
+    min-height: 132px;
+  }
+
+  /* 原毛病：column-reverse + 按钮 width:100%，768 档禁用态的「等待中」变成一条全宽灰带压住信息（M10）；
+     改成信息在上、按钮在下，按钮收缩回内容宽（min-width:134px 仍兜底）。 */
+  .y-tray-foot {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .y-roll-btn {
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dice-row-item,
+  .dice-hit,
+  .die-face {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ── 窄屏（手机 / 未来安卓移植）─────────────────────────────────────
+   问题：计分条是 flex 且子项不能收缩，min-content 撑宽了 grid 的 1fr，
+   整页横向溢出（计分条、骰子盘、计分板一起被切右边）。
+   做法：允许收缩 + 允许换行 + 收紧字号。
+   ─────────────────────────────────────────────────────────────────── */
+
+.game-layout,
+.play-column,
+.side-column,
+.board-wrap,
+.yacht-board,
+.y-panel,
+.y-tray,
+.y-dice-slot,
+.dice-tray-3d {
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .scorebar {
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    padding: 12px 14px;
+  }
+
+  .scorebar .player-chip {
+    flex: 1 1 130px;
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .scorebar .player-tag {
+    display: none;
+  }
+
+  .scorebar .player-name {
+    font-size: 13px;
+  }
+
+  .scorebar .player-score {
+    font-size: 19px;
+  }
+
+  .scorebar .round-center {
+    order: 3;
+    flex: 1 1 100%;
+    align-items: flex-start;
+  }
+
+  .room-page,
+  .app-shell {
+    overflow-x: hidden;
+  }
+
+  .room-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .y-panel {
+    padding: 12px 10px 6px;
+  }
+}
+
+/* ── 触控目标（产品已拍板：按钮/输入/手势键 ≥44px，棋盘格例外）──────────
+   只对触摸设备生效，桌面 pointer:fine 保持原紧凑观感。
+   棋盘格不加：8×8 在 412 宽下每格只有 35–40px，硬塞 44 必然横向溢出；
+   猜拳手势键本身 ≥96px，不用动；骰子/棋盘格都不在下面的选择器里。 */
+
+@media (pointer: coarse) {
+  .btn,
+  .btn-mini,
+  .btn-lg,
+  .icon-btn,
+  .invite-close,
+  .audio-controls button,
+  .room-back {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* 音量胶囊本体固定 34px，内部按钮抬到 44 会顶出胶囊，所以连容器一起抬高 */
+  .audio-controls {
+    height: 44px;
+  }
+}
+
+
+
+/* ── 旁观模式横幅 ────────────────────────────────────────────────────────
+   第 12 轮席位鉴权后，没有 0 号位令牌的浏览器会被服务端降级成旁观观测。
+   这里必须显式告诉人「为什么不能动」，否则棋盘禁用看起来像卡死。 */
+.spectator-banner {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border: 1px solid rgba(192, 138, 46, 0.32);
+  border-radius: var(--radius-lg);
+  background: var(--amber-soft);
+  color: var(--amber-ink);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.spectator-banner b {
+  flex: none;
+  font-weight: 700;
+}
+
+.spectator-banner code {
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.6);
+  font-size: 0.92em;
+}
+
+@media (max-width: 560px) {
+  .spectator-banner {
+    flex-direction: column;
+    gap: 4px;
+  }
+}

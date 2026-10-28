@@ -1,0 +1,31 @@
+{
+  "name": "@ai-playground/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./start": "./src/server.ts",
+    "./rooms": "./src/rooms.ts",
+    "./persist": "./src/persist.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "test": "tsx --test test/rooms.test.ts test/http.test.ts test/persist.test.ts"
+  },
+  "dependencies": {
+    "@ai-playground/core": "workspace:*",
+    "@ai-playground/mcp": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/ws": "^8.5.12",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}
+

@@ -1,0 +1,81 @@
+/* ============================================================================
+   board-shell.css —— 六款棋盘共用的骨架（见 components/BoardShell.tsx）
+   合并自 battleship.css / reversi.css / rps-duel.css 三套几乎同构的
+   xx-head / xx-kicker / xx-title / xx-head-meta。现在只有一层：
+   一行 kicker + 右对齐 meta，不再有棋盘大标题（计分条已经给全信息）。
+   ========================================================================== */
+
+.board-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.board-shell-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* kicker 是棋盘上唯一的说明文字，用 --ink-3（不是 --ink-4）保证对比度；
+   中文句子里 letter-spacing 收在 0.02em，原来的大写转换对中文没有意义。 */
+.board-kicker {
+  min-width: 0;
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 560;
+  line-height: 1.45;
+  letter-spacing: 0.02em;
+  color: var(--ink-3);
+}
+
+.board-shell-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* 通用角标胶囊：抢宝 / 四子棋 / 快艇本来没有 chip 样式，统一用这个 */
+.board-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 11px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.board-chip b {
+  font-size: 13px;
+  font-weight: 660;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 窄屏：kicker 与角标拆成两行，412px 下不挤在一行里溢出 ─────────────── */
+
+@media (max-width: 560px) {
+  .board-shell {
+    gap: 10px;
+  }
+
+  .board-shell-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .board-shell-meta {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

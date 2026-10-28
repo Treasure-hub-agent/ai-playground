@@ -1,0 +1,37 @@
+{
+  "name": "@ai-playground/cli",
+  "version": "0.1.0",
+  "description": "AI 游乐场命令行：一条命令起服务（REST + WebSocket + Web 界面），人类与 AI Agent 同桌玩小游戏",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "ai-playground": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "web"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "ai",
+    "mcp",
+    "game",
+    "agent",
+    "playground"
+  ],
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "node ../../scripts/pack-cli.mjs --no-pack",
+    "pack": "node ../../scripts/pack-cli.mjs"
+  },
+  "devDependencies": {
+    "@ai-playground/mcp": "workspace:*",
+    "@ai-playground/server": "workspace:*",
+    "@types/node": "^22.9.0",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

@@ -1,0 +1,736 @@
+/* ============================================================================
+   scorecard.css —— 快艇骰子计分板（重做版）
+   仅作用于 YachtScorecard，不覆盖 theme.css 里的 .y-* 旧样式。
+   ========================================================================== */
+
+.ysc {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  color: var(--ink);
+}
+
+/* ── 头部：回合状态 + 图例 ─────────────────────────────────────────────── */
+
+.ysc-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px;
+}
+
+.ysc-head-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.ysc-turn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 560;
+  letter-spacing: 0.03em;
+  color: var(--ink-3);
+}
+
+.ysc-turn-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-4);
+}
+
+.ysc-turn.is-mine {
+  color: var(--ink);
+}
+
+.ysc-turn.is-mine .ysc-turn-dot {
+  background: var(--teal);
+  box-shadow: 0 0 0 3px rgba(47, 131, 124, 0.14);
+}
+
+.ysc-status {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+
+.ysc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px 12px;
+  font-size: 10.5px;
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+
+.ysc-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ysc-key {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  flex: none;
+}
+
+.ysc-key.is-preview {
+  background: var(--amber-soft);
+  border: 1px solid rgba(192, 138, 46, 0.38);
+}
+
+.ysc-key.is-filled {
+  background: rgba(23, 26, 33, 0.07);
+  border: 1px solid var(--line);
+}
+
+.ysc-key.is-best {
+  width: 3px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--amber);
+}
+
+/* ── 两栏布局 ─────────────────────────────────────────────────────────── */
+
+.ysc-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.ysc-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.ysc-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.ysc-group-title {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 620;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+}
+
+.ysc-group-meta {
+  font-size: 10.5px;
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+
+/* ── 上区 63 分进度 ───────────────────────────────────────────────────── */
+
+.ysc-meter {
+  padding: 10px 14px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.ysc-meter-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 10.5px;
+  color: var(--ink-3);
+}
+
+.ysc-meter-label {
+  white-space: nowrap;
+}
+
+.ysc-meter-label b {
+  margin: 0 1px;
+  font-size: 14px;
+  font-weight: 660;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.ysc-meter-note {
+  color: var(--ink-4);
+  text-align: right;
+}
+
+.ysc-meter-track {
+  position: relative;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(23, 26, 33, 0.08);
+  overflow: hidden;
+}
+
+.ysc-meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #d8a445, var(--amber));
+  transition: width var(--dur-3) var(--ease-out), background var(--dur-2) var(--ease);
+}
+
+.ysc-meter.is-complete .ysc-meter-fill {
+  background: linear-gradient(90deg, #3fa39a, var(--teal));
+}
+
+.ysc-meter.is-complete .ysc-meter-note {
+  color: var(--teal);
+  font-weight: 560;
+}
+
+/* 列标题：与行使用同一套列宽 */
+.ysc-col-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 58px 36px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px 4px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 9.5px;
+  font-weight: 520;
+  letter-spacing: 0.08em;
+  color: var(--ink-4);
+}
+
+.ysc-col-head span:nth-child(2),
+.ysc-col-head span:nth-child(3) {
+  text-align: right;
+}
+
+/* ── 每一行都是整行按钮 ───────────────────────────────────────────────── */
+
+.ysc-rows {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ysc-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 58px 36px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 50px;
+  margin: 0;
+  padding: 7px 12px 7px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  text-align: left;
+  cursor: default;
+  transition:
+    background var(--dur-2) var(--ease),
+    box-shadow var(--dur-2) var(--ease);
+}
+
+.ysc-row:last-child {
+  border-bottom: 0;
+}
+
+.ysc-row.is-pickable {
+  cursor: pointer;
+}
+
+.ysc-row.is-pickable:hover {
+  background: rgba(192, 138, 46, 0.07);
+}
+
+.ysc-row.is-pickable:active {
+  background: rgba(192, 138, 46, 0.12);
+}
+
+.ysc-row:focus-visible {
+  outline: 2px solid rgba(23, 26, 33, 0.55);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
+.ysc-row.is-best::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--amber);
+}
+
+.ysc-row.is-pending {
+  background: var(--amber-soft);
+  box-shadow: inset 0 0 0 1px rgba(192, 138, 46, 0.28);
+}
+
+.ysc-row.is-pending.is-best::before {
+  background: #a9761f;
+}
+
+.ysc-row.is-filled {
+  cursor: default;
+}
+
+.ysc-row.is-filled .ysc-label-main {
+  color: var(--ink-3);
+  font-weight: 520;
+}
+
+/* 左侧：栏目名 + 规则提示 */
+.ysc-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.ysc-label-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13.5px;
+  font-weight: 560;
+  line-height: 1.35;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.ysc-hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: var(--ink-4);
+}
+
+.ysc-best-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: 0 0 0 3px rgba(192, 138, 46, 0.14);
+  flex: none;
+}
+
+/* 右侧：我的分（大）/ 对手分（小） */
+.ysc-mine {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  justify-self: end;
+  min-width: 46px;
+  min-height: 32px;
+  padding: 1px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 21px;
+  font-weight: 650;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.ysc-mine.is-preview {
+  /* 小字题色改用 --amber-ink（amber 在 amber-soft 底上只有 ~2.7:1） */
+  color: var(--amber-ink);
+  background: var(--amber-soft);
+  border-color: rgba(192, 138, 46, 0.3);
+}
+
+.ysc-mine.is-filled {
+  color: var(--ink-2);
+  background: rgba(23, 26, 33, 0.055);
+  border-color: transparent;
+}
+
+.ysc-mine.is-empty {
+  min-width: 24px;
+  padding: 0;
+  color: var(--ink-4);
+  font-size: 16px;
+  font-weight: 520;
+}
+
+.ysc-mine.is-zero-preview {
+  /* 小字题色改用 --amber-ink（amber 在浅暖底上不达 AA） */
+  color: var(--amber-ink);
+  background: rgba(192, 138, 46, 0.09);
+  border-color: rgba(192, 138, 46, 0.18);
+}
+
+.ysc-row.is-filled .ysc-mine {
+  font-size: 20px;
+}
+
+.ysc-opp {
+  justify-self: end;
+  min-width: 24px;
+  font-size: 14px;
+  font-weight: 520;
+  line-height: 1;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-4);
+}
+
+/* ── 行内确认条（不浮层、不 sticky） ───────────────────────────────────── */
+
+.ysc-confirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  background: #fbf3e2;
+  border-top: 1px solid rgba(192, 138, 46, 0.24);
+  border-bottom: 1px solid var(--line);
+  animation: ysc-reveal var(--dur-2) var(--ease-out);
+}
+
+.ysc-confirm:last-child {
+  border-bottom: 0;
+}
+
+.ysc-confirm.is-zero {
+  background: #fdf2f0;
+  border-top-color: rgba(180, 69, 47, 0.2);
+}
+
+.ysc-confirm-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ysc-confirm-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.ysc-confirm-title b {
+  font-size: 13.5px;
+  font-weight: 620;
+  color: var(--ink);
+}
+
+.ysc-arrow {
+  margin: 0 1px;
+  color: var(--ink-4);
+}
+
+.ysc-confirm-title .ysc-confirm-score {
+  font-size: 18px;
+  font-weight: 680;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  /* 18px 未达「大字号」门槛，仍按正文要求 4.5:1，改用 --amber-ink */
+  color: var(--amber-ink);
+}
+
+.ysc-confirm.is-zero .ysc-confirm-score {
+  color: var(--danger);
+}
+
+.ysc-confirm-warn {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--danger);
+}
+
+.ysc-confirm-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.ysc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 560;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background var(--dur-2) var(--ease),
+    border-color var(--dur-2) var(--ease),
+    color var(--dur-2) var(--ease),
+    transform var(--dur-1) var(--ease);
+}
+
+.ysc-btn:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.ysc-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ysc-btn:focus-visible {
+  outline: 2px solid rgba(23, 26, 33, 0.55);
+  outline-offset: 2px;
+}
+
+.ysc-btn-ghost {
+  background: transparent;
+  color: var(--ink-3);
+}
+
+.ysc-btn-ghost:hover:not(:disabled) {
+  background: rgba(23, 26, 33, 0.055);
+  color: var(--ink);
+}
+
+.ysc-btn-primary {
+  background: var(--accent-ink);
+  border-color: var(--accent-ink);
+  color: #fff;
+}
+
+.ysc-btn-primary:hover:not(:disabled) {
+  background: #232834;
+  border-color: #232834;
+}
+
+/* ── 组脚注：小计 / 总分 / 奖励章 ─────────────────────────────────────── */
+
+.ysc-group-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  padding: 9px 14px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--line);
+}
+
+.ysc-foot-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.ysc-foot-label {
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+
+.ysc-foot-value {
+  font-size: 21px;
+  font-weight: 660;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.ysc-group-foot.is-total .ysc-foot-value {
+  font-size: 23px;
+}
+
+.ysc-foot-stat.is-opp {
+  color: var(--ink-4);
+}
+
+.ysc-foot-opp {
+  font-size: 14px;
+  font-weight: 520;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+
+.ysc-bonus-chip {
+  margin-left: auto;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(23, 26, 33, 0.045);
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.ysc-bonus-chip.is-hit {
+  color: var(--teal);
+  background: rgba(47, 131, 124, 0.09);
+  border-color: rgba(47, 131, 124, 0.24);
+  font-weight: 560;
+}
+
+/* ── 提示 ─────────────────────────────────────────────────────────────── */
+
+.ysc-note {
+  margin: 0 2px;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--ink-4);
+}
+
+.ysc-note.is-warn {
+  color: var(--danger);
+}
+
+@keyframes ysc-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── 响应式：≤900px 单栏堆叠 ──────────────────────────────────────────── */
+
+@media (max-width: 1100px) {
+  .ysc-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ysc-row {
+    min-height: 52px;
+  }
+}
+
+@media (max-width: 560px) {
+  .ysc-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .ysc-legend {
+    justify-content: flex-start;
+  }
+
+  .ysc-row {
+    grid-template-columns: minmax(0, 1fr) 52px 30px;
+    gap: 6px;
+    padding: 7px 10px 7px 12px;
+  }
+
+  .ysc-col-head {
+    grid-template-columns: minmax(0, 1fr) 52px 30px;
+    gap: 6px;
+    padding: 5px 10px 4px 12px;
+  }
+
+  .ysc-hint {
+    display: none;
+  }
+
+  .ysc-mine {
+    font-size: 20px;
+    min-width: 42px;
+  }
+
+  .ysc-row.is-filled .ysc-mine {
+    font-size: 19px;
+  }
+
+  .ysc-group-foot {
+    gap: 6px 8px;
+  }
+
+  .ysc-bonus-chip {
+    margin-left: 0;
+  }
+
+  .ysc-confirm {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ysc-confirm-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .ysc-confirm-actions .ysc-btn {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ysc-row,
+  .ysc-meter-fill,
+  .ysc-btn {
+    transition: none;
+  }
+
+  .ysc-confirm {
+    animation: none;
+  }
+}
+
+/* 确认条在窄列里会被压扁：文字占满一行，按钮整体换到下一行且不被压缩 */
+.ysc-confirm > .ysc-confirm-text {
+  flex: 1 1 100%;
+}
+
+.ysc-confirm-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.ysc-confirm-actions .ysc-btn {
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+

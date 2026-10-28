@@ -1,0 +1,21 @@
+node_modules/
+dist/
+dist-ssr/
+*.log
+.DS_Store
+.env
+.env.local
+.pnpm-store/
+coverage/
+
+# CLI 打包产物（scripts/pack-cli.mjs）：web/ 与 dist/ 是复制/生成出来的，不进仓库
+packages/cli/web/
+packages/cli/dist/
+*.tgz
+
+# 房间落盘目录（第 13 轮起 pnpm serve / npx ai-playground 会写这里）
+data/
+packages/server/data/
+
+# 音频产物：由 scripts/sync-audio.mjs 从 assets/audio 生成（dev/build 都会自动同步），不进仓库
+packages/web/public/audio/

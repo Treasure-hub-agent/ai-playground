@@ -1,0 +1,310 @@
+/* ============================================================================
+   audio.css —— 音频控件（只作用于 AudioControls，不改动全局样式）
+   风格：沿用 theme.css 的墨色 / 暖纸 / 细描边 / 三层阴影
+   ========================================================================== */
+
+.audio-controls {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px 0 4px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+  box-shadow: var(--shadow-1);
+  transition:
+    border-color var(--dur-2) var(--ease),
+    box-shadow var(--dur-2) var(--ease),
+    background var(--dur-2) var(--ease),
+    opacity var(--dur-2) var(--ease);
+  user-select: none;
+}
+
+.audio-controls:hover {
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-2);
+}
+
+.audio-controls.is-on.is-playing {
+  border-color: rgba(47, 131, 124, 0.3);
+  box-shadow:
+    var(--shadow-1),
+    0 0 0 3px rgba(47, 131, 124, 0.07);
+}
+
+.audio-controls.is-muted {
+  background: var(--surface-2);
+}
+
+.audio-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 26px;
+  min-width: 30px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition:
+    background var(--dur-2) var(--ease),
+    color var(--dur-2) var(--ease),
+    transform var(--dur-1) var(--ease);
+}
+
+.audio-toggle:hover {
+  background: rgba(23, 26, 33, 0.055);
+  color: var(--ink);
+}
+
+.audio-toggle:active {
+  transform: scale(0.94);
+}
+
+.audio-controls.is-on .audio-toggle {
+  color: var(--ink);
+}
+
+.audio-controls.is-on.is-playing .audio-toggle {
+  color: var(--teal);
+}
+
+.audio-controls.is-muted .audio-toggle {
+  color: var(--ink-4);
+}
+
+.audio-eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  width: 8px;
+  height: 11px;
+}
+
+.audio-eq i {
+  display: block;
+  width: 2px;
+  height: 100%;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.3;
+  transform: scaleY(0.35);
+  transform-origin: bottom center;
+}
+
+.audio-controls.is-playing .audio-eq i {
+  opacity: 0.85;
+  animation: audio-eq-bounce 900ms var(--ease) infinite;
+}
+
+.audio-controls.is-playing .audio-eq i:nth-child(2) {
+  animation-delay: 150ms;
+  animation-duration: 760ms;
+}
+
+.audio-controls.is-playing .audio-eq i:nth-child(3) {
+  animation-delay: 320ms;
+  animation-duration: 1040ms;
+}
+
+.audio-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--line-strong);
+  opacity: 0.7;
+}
+
+.audio-range {
+  --audio-fill: 55%;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 66px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.audio-range::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--ink) 0 var(--audio-fill),
+    rgba(23, 26, 33, 0.13) var(--audio-fill) 100%
+  );
+}
+
+.audio-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 11px;
+  height: 11px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1.5px solid var(--ink);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.18);
+  transition: transform var(--dur-1) var(--ease);
+}
+
+.audio-range:hover::-webkit-slider-thumb,
+.audio-range:active::-webkit-slider-thumb {
+  transform: scale(1.16);
+}
+
+.audio-range::-moz-range-track {
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(23, 26, 33, 0.13);
+}
+
+.audio-range::-moz-range-progress {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--ink);
+}
+
+.audio-range::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1.5px solid var(--ink);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.18);
+}
+
+.audio-range:focus-visible {
+  outline: 2px solid rgba(23, 26, 33, 0.55);
+  outline-offset: 3px;
+  border-radius: 999px;
+}
+
+.audio-value {
+  min-width: 18px;
+  color: var(--ink-4);
+  font-size: 10.5px;
+  font-weight: 520;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  letter-spacing: 0.01em;
+}
+
+/* ── 悬浮提示：当前曲目 / 素材状态 ─────────────────────────────────────── */
+
+.audio-tip {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: -4px;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: max-content;
+  max-width: 250px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: rgba(23, 26, 33, 0.94);
+  color: #fff;
+  box-shadow: var(--shadow-2);
+  opacity: 0;
+  transform: translateY(-3px);
+  pointer-events: none;
+  transition:
+    opacity var(--dur-2) var(--ease),
+    transform var(--dur-2) var(--ease);
+  text-align: left;
+}
+
+.audio-tip::before {
+  content: '';
+  position: absolute;
+  top: -3.5px;
+  right: 17px;
+  width: 7px;
+  height: 7px;
+  border-radius: 1px;
+  background: rgba(23, 26, 33, 0.94);
+  transform: rotate(45deg);
+}
+
+.audio-tip b {
+  font-size: 11.5px;
+  font-weight: 560;
+  line-height: 1.45;
+}
+
+.audio-tip span {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.audio-controls:hover .audio-tip,
+.audio-controls:focus-within .audio-tip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.audio-controls[data-manifest='missing'] .audio-toggle {
+  color: var(--ink-3);
+}
+
+@keyframes audio-eq-bounce {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@media (max-width: 820px) {
+  .audio-range {
+    width: 50px;
+  }
+
+  .audio-value {
+    display: none;
+  }
+
+  .audio-tip {
+    right: auto;
+    left: 0;
+  }
+
+  .audio-tip::before {
+    right: auto;
+    left: 18px;
+  }
+}
+
+/* 牌桌顶栏用紧凑版：平时只留喇叭开关，悬停 / 键盘聚焦时再展开滑块 */
+.audio-controls.is-compact {
+  padding: 4px 6px;
+  gap: 4px;
+}
+
+.audio-controls.is-compact .audio-divider,
+.audio-controls.is-compact .audio-range,
+.audio-controls.is-compact .audio-value {
+  display: none;
+}
+
+/* 展开用 DOM 里真实存在的 .audio-range（旧稿写的两个滑块类名并不存在） */
+.audio-controls.is-compact:hover .audio-divider,
+.audio-controls.is-compact:focus-within .audio-divider,
+.audio-controls.is-compact:hover .audio-range,
+.audio-controls.is-compact:focus-within .audio-range,
+.audio-controls.is-compact:hover .audio-value,
+.audio-controls.is-compact:focus-within .audio-value {
+  display: inline-block;
+}

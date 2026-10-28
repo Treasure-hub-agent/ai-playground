@@ -1,0 +1,349 @@
+/* ============================================================================
+   reversi.css —— 黑白棋对局界面
+   仅作用于 .rv-*；木色盘框 + 深绿盘面，棋子沿用主题的亮纸 / 墨色。
+   头部（kicker + 角标）已收进 board-shell.css，这里不再画标题区。
+   ========================================================================== */
+
+/* 只负责「卡片外观」：纵向排布与间距由 .board-shell 统一给。 */
+.rv-board {
+  width: 100%;
+  max-width: 620px;
+  margin-inline: auto;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+  color: var(--ink);
+}
+
+/* ── 回合 / 落点数角标（挂在 board-shell 的 meta 槽里）────────────────── */
+
+.rv-head-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.rv-turn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 11px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.rv-turn.is-mine {
+  color: var(--teal);
+  border-color: rgba(47, 131, 124, 0.24);
+  background: rgba(47, 131, 124, 0.06);
+  font-weight: 560;
+}
+
+.rv-turn-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.75;
+}
+
+.rv-legal-count {
+  font-size: 10.5px;
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── 比分 / 上一手 ────────────────────────────────────────────────────── */
+
+.rv-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 5px 14px;
+  min-width: 0;
+}
+
+.rv-counts {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.rv-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.rv-count b {
+  font-size: 17px;
+  font-weight: 660;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.rv-count.is-opp b {
+  color: var(--plum);
+}
+
+.rv-mini {
+  display: inline-block;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.rv-mini.is-you {
+  background: radial-gradient(circle at 34% 28%, #fffdf7 0%, #eadfcb 72%);
+  border: 1px solid #b6a687;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.18);
+}
+
+.rv-mini.is-opp {
+  background: radial-gradient(circle at 34% 28%, #454b56 0%, #12161d 74%);
+  border: 1px solid #05070a;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.22);
+}
+
+.rv-mini.is-opp + * {
+  color: var(--plum);
+}
+
+.rv-last-move {
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 10.5px;
+  color: var(--ink-4);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ── 木框 + 深绿棋盘 ──────────────────────────────────────────────────── */
+
+.rv-board-frame {
+  padding: 8px;
+  border: 1px solid #b7a17b;
+  border-radius: 16px;
+  background: linear-gradient(150deg, #dfceb0 0%, #c9b48f 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -2px 0 rgba(90, 70, 40, 0.18),
+    var(--shadow-1);
+}
+
+.rv-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 2px;
+  padding: 4px;
+  border-radius: 10px;
+  background: #17251f;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+.rv-cell {
+  position: relative;
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: #2e5147;
+  cursor: default;
+  perspective: 420px;
+  transition:
+    background var(--dur-2) var(--ease),
+    box-shadow var(--dur-2) var(--ease);
+}
+
+.rv-cell:disabled {
+  opacity: 1;
+}
+
+.rv-cell.is-legal {
+  cursor: pointer;
+}
+
+.rv-cell.is-legal:hover {
+  background: #3a6356;
+}
+
+.rv-cell.is-legal:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: -2px;
+}
+
+.rv-cell.is-last {
+  box-shadow: inset 0 0 0 2px var(--amber);
+}
+
+.rv-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 24%;
+  height: 24%;
+  border-radius: 50%;
+  background: rgba(255, 233, 178, 0.85);
+  box-shadow: 0 0 0 3px rgba(255, 233, 178, 0.12);
+  transform: translate(-50%, -50%);
+  transition:
+    transform var(--dur-2) var(--ease),
+    background var(--dur-2) var(--ease);
+}
+
+.rv-cell.is-legal:hover .rv-hint {
+  background: #ffe3a1;
+  transform: translate(-50%, -50%) scale(1.35);
+}
+
+/* ── 棋子 ─────────────────────────────────────────────────────────────── */
+
+.rv-disc {
+  position: absolute;
+  inset: 9%;
+  border-radius: 50%;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.rv-disc.is-you {
+  border: 1px solid #b6a687;
+  background: radial-gradient(circle at 34% 28%, #fffdf7 0%, #f1e7d4 48%, #d8cab1 100%);
+  box-shadow:
+    inset 0 -2px 4px rgba(90, 75, 50, 0.22),
+    0 2px 3px rgba(0, 0, 0, 0.3);
+}
+
+.rv-disc.is-opp {
+  border: 1px solid #05070a;
+  background: radial-gradient(circle at 34% 28%, #4b515d 0%, #252b35 48%, #10141a 100%);
+  box-shadow:
+    inset 0 -2px 4px rgba(0, 0, 0, 0.45),
+    0 2px 3px rgba(0, 0, 0, 0.32);
+}
+
+.rv-disc.is-new {
+  animation: rv-place 220ms var(--ease-out) both;
+}
+
+.rv-disc.is-flipping {
+  animation: rv-flip 260ms var(--ease) both;
+}
+
+/* ── 图例 ─────────────────────────────────────────────────────────────── */
+
+.rv-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 10px;
+  color: var(--ink-4);
+}
+
+.rv-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.rv-legend-hint {
+  margin-left: auto;
+}
+
+/* ── 动效 ─────────────────────────────────────────────────────────────── */
+
+@keyframes rv-place {
+  from {
+    opacity: 0.2;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes rv-flip {
+  0% {
+    transform: rotateY(0deg);
+  }
+  46% {
+    transform: rotateY(90deg);
+  }
+  54% {
+    transform: rotateY(90deg);
+  }
+  100% {
+    transform: rotateY(0deg);
+  }
+}
+
+/* ── 窄屏 ─────────────────────────────────────────────────────────────── */
+
+@media (max-width: 560px) {
+  .rv-board {
+    padding: 12px;
+    border-radius: var(--radius-lg);
+  }
+
+  .rv-head-meta {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .rv-info {
+    gap: 4px 10px;
+  }
+
+  .rv-last-move {
+    width: 100%;
+  }
+
+  .rv-board-frame {
+    padding: 6px;
+    border-radius: 13px;
+  }
+
+  .rv-grid {
+    gap: 1.5px;
+    padding: 3px;
+    border-radius: 8px;
+  }
+
+  .rv-cell {
+    border-radius: 2px;
+  }
+
+  .rv-legend-hint {
+    margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rv-cell,
+  .rv-hint {
+    transition: none;
+  }
+
+  .rv-disc.is-new,
+  .rv-disc.is-flipping {
+    animation: none;
+  }
+}

@@ -1,0 +1,602 @@
+/* ============================================================================
+   battleship.css —— 深海猎手对局界面
+   仅作用于 .bs-*，沿用 theme.css 的墨色 / 暖纸 / 细描边 / 三层阴影。
+   头部（kicker + 角标）已收进 board-shell.css，这里不再画标题区。
+   ========================================================================== */
+
+/* 只负责「卡片外观」：纵向排布与间距由 .board-shell 统一给，
+   这样六款棋盘的头部到盘面的节奏才一致。 */
+.bs-board {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+  color: var(--ink);
+}
+
+/* ── 剩余舰船角标（挂在 board-shell 的 meta 槽里）─────────────────────── */
+
+.bs-fleet-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bs-count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 11px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.bs-count b {
+  font-size: 16px;
+  font-weight: 660;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.bs-count.is-mine b {
+  color: var(--teal);
+}
+
+/* ── 主布局 ───────────────────────────────────────────────────────────── */
+
+.bs-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 248px;
+  gap: 16px;
+  align-items: start;
+}
+
+.bs-main {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bs-main-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bs-main-title {
+  font-size: 12.5px;
+  font-weight: 620;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+}
+
+.bs-main-meta {
+  font-size: 10.5px;
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 战斗提示 ─────────────────────────────────────────────────────────── */
+
+.bs-notice {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 7px 10px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: rgba(23, 26, 33, 0.02);
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+
+.bs-notice-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-4);
+}
+
+.bs-notice.is-hit {
+  border-style: solid;
+  border-color: rgba(47, 131, 124, 0.26);
+  background: rgba(47, 131, 124, 0.06);
+  color: var(--teal);
+  font-weight: 560;
+}
+
+.bs-notice.is-hit .bs-notice-dot {
+  background: var(--teal);
+  box-shadow: 0 0 0 3px rgba(47, 131, 124, 0.14);
+}
+
+.bs-notice.is-good {
+  border-style: solid;
+  border-color: rgba(192, 138, 46, 0.3);
+  background: var(--amber-soft);
+  color: #8a5a12;
+  font-weight: 620;
+}
+
+.bs-notice.is-good .bs-notice-dot {
+  background: var(--amber);
+  box-shadow: 0 0 0 3px rgba(192, 138, 46, 0.16);
+}
+
+.bs-notice.is-incoming,
+.bs-notice.is-bad {
+  border-style: solid;
+  border-color: rgba(180, 69, 47, 0.22);
+  background: rgba(180, 69, 47, 0.055);
+  color: var(--danger);
+}
+
+.bs-notice.is-incoming .bs-notice-dot,
+.bs-notice.is-bad .bs-notice-dot {
+  background: var(--danger);
+}
+
+/* ── 敌方海域 ─────────────────────────────────────────────────────────── */
+
+.bs-enemy-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  max-width: 430px;
+  margin-inline: auto;
+}
+
+.bs-cell {
+  position: relative;
+  aspect-ratio: 1;
+  min-height: 64px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: linear-gradient(155deg, #263941 0%, #1b2a31 100%);
+  color: #e4edf2;
+  font-family: inherit;
+  cursor: default;
+  overflow: hidden;
+  transition:
+    transform var(--dur-1) var(--ease),
+    box-shadow var(--dur-2) var(--ease),
+    border-color var(--dur-2) var(--ease),
+    background var(--dur-2) var(--ease);
+}
+
+.bs-cell:disabled {
+  opacity: 1;
+}
+
+.bs-cell.is-legal {
+  cursor: pointer;
+  border-color: rgba(47, 131, 124, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(47, 131, 124, 0.16);
+}
+
+.bs-cell.is-legal:hover {
+  transform: translateY(-2px);
+  border-color: var(--teal);
+  background: linear-gradient(155deg, #2c4a4a 0%, #1e3538 100%);
+  box-shadow:
+    0 0 0 3px rgba(47, 131, 124, 0.16),
+    0 12px 20px -16px rgba(16, 24, 40, 0.7);
+}
+
+.bs-cell.is-legal:active {
+  transform: translateY(0) scale(0.985);
+}
+
+.bs-cell:focus-visible {
+  outline: 2px solid rgba(47, 131, 124, 0.85);
+  outline-offset: 2px;
+}
+
+.bs-cell.is-miss {
+  background: linear-gradient(155deg, #22343a 0%, #1a282d 100%);
+}
+
+.bs-cell.is-hit {
+  border-color: rgba(192, 138, 46, 0.48);
+  background: linear-gradient(155deg, #45391f 0%, #2b291f 100%);
+}
+
+.bs-cell.is-sunk {
+  border-color: rgba(192, 138, 46, 0.62);
+  background: linear-gradient(155deg, #4b2e27 0%, #2a2320 100%);
+  box-shadow: inset 0 0 0 2px rgba(192, 138, 46, 0.65);
+}
+
+.bs-cell.is-last {
+  box-shadow:
+    0 0 0 2px var(--amber),
+    0 0 0 5px rgba(192, 138, 46, 0.16);
+}
+
+.bs-cell.is-last.is-sunk {
+  box-shadow:
+    inset 0 0 0 2px rgba(192, 138, 46, 0.65),
+    0 0 0 2px var(--amber),
+    0 0 0 5px rgba(192, 138, 46, 0.16);
+}
+
+.bs-cell-inner {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.bs-reticle {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  border: 1.5px dashed rgba(126, 216, 204, 0.55);
+  border-radius: 50%;
+  opacity: 0.75;
+}
+
+.bs-reticle::before,
+.bs-reticle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  background: rgba(126, 216, 204, 0.4);
+  transform: translate(-50%, -50%);
+}
+
+.bs-reticle::before {
+  width: 1px;
+  height: 8px;
+}
+
+.bs-reticle::after {
+  width: 8px;
+  height: 1px;
+}
+
+.bs-cell.is-legal:hover .bs-reticle {
+  opacity: 1;
+  border-color: rgba(126, 216, 204, 0.9);
+}
+
+.bs-miss-mark {
+  position: relative;
+  width: 17px;
+  height: 17px;
+  border: 2px solid rgba(180, 210, 225, 0.5);
+  border-radius: 50%;
+}
+
+.bs-miss-mark::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: rgba(180, 210, 225, 0.22);
+}
+
+.bs-hit-mark {
+  font-size: 27px;
+  font-weight: 560;
+  line-height: 1;
+  color: var(--amber);
+  text-shadow: 0 0 12px rgba(192, 138, 46, 0.35);
+}
+
+.bs-sunk-mark {
+  font-size: 24px;
+  line-height: 1;
+  color: #f0c76a;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3));
+}
+
+.bs-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px 12px;
+  padding-top: 2px;
+  font-size: 10px;
+  color: var(--ink-4);
+}
+
+.bs-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.bs-swatch {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+}
+
+.bs-swatch.is-unknown {
+  background: #263941;
+}
+
+.bs-swatch.is-miss {
+  background: #22343a;
+}
+
+.bs-swatch.is-hit {
+  background: #6b5525;
+}
+
+.bs-swatch.is-sunk {
+  background: #5a352d;
+}
+
+/* ── 我方海域侧栏 ─────────────────────────────────────────────────────── */
+
+.bs-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.bs-panel {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.bs-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+
+.bs-panel-title {
+  font-size: 12px;
+  font-weight: 620;
+  color: var(--ink-2);
+}
+
+.bs-panel-sub {
+  font-size: 10.5px;
+  color: var(--ink-4);
+}
+
+.bs-own-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  width: 100%;
+  max-width: 220px;
+  margin-inline: auto;
+}
+
+.bs-own-cell {
+  position: relative;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(23, 26, 33, 0.03);
+}
+
+.bs-own-cell.has-ship {
+  border-color: rgba(47, 131, 124, 0.22);
+  background: rgba(47, 131, 124, 0.075);
+}
+
+.bs-own-ship {
+  width: 56%;
+  height: 56%;
+  border-radius: 50%;
+  background: var(--teal);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.14);
+}
+
+.bs-own-cell.is-hit {
+  border-color: rgba(180, 69, 47, 0.3);
+  background: rgba(180, 69, 47, 0.075);
+}
+
+.bs-own-hit {
+  font-size: 12px;
+  font-weight: 660;
+  line-height: 1;
+  color: var(--danger);
+}
+
+.bs-own-cell.is-sunk {
+  border-color: var(--line);
+  background: rgba(23, 26, 33, 0.05);
+}
+
+.bs-own-cell.is-sunk .bs-own-ship,
+.bs-own-cell.is-sunk .bs-own-hit {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
+.bs-own-cell.is-incoming {
+  box-shadow: 0 0 0 2px rgba(180, 69, 47, 0.8);
+}
+
+.bs-ship-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 10px 0 0;
+  padding: 8px 0 0;
+  border-top: 1px dashed var(--line);
+  list-style: none;
+}
+
+.bs-ship-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: var(--ink-3);
+}
+
+.bs-ship-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--teal);
+}
+
+.bs-ship-list li.is-sunk .bs-ship-dot {
+  background: var(--ink-4);
+}
+
+.bs-ship-name {
+  font-weight: 560;
+  color: var(--ink-2);
+}
+
+.bs-ship-list li.is-sunk .bs-ship-name {
+  color: var(--ink-4);
+  text-decoration: line-through;
+}
+
+.bs-ship-size {
+  color: var(--ink-4);
+}
+
+.bs-ship-status {
+  margin-left: auto;
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+
+.bs-ship-list li.is-sunk .bs-ship-status {
+  color: var(--danger);
+}
+
+.bs-last-shot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.bs-last-shot.is-mine {
+  border-color: rgba(47, 131, 124, 0.2);
+}
+
+.bs-last-label {
+  flex: none;
+  color: var(--ink-4);
+}
+
+.bs-last-text {
+  overflow: hidden;
+  color: var(--ink-2);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ── 窄屏 ─────────────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .bs-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bs-side {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .bs-panel {
+    grid-row: span 2;
+  }
+
+  .bs-own-grid {
+    max-width: 240px;
+  }
+}
+
+@media (max-width: 560px) {
+  .bs-board {
+    padding: 12px;
+    border-radius: var(--radius-lg);
+  }
+
+  .bs-fleet-counts {
+    width: 100%;
+  }
+
+  .bs-count {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .bs-enemy-grid {
+    gap: 5px;
+  }
+
+  .bs-cell {
+    min-height: 64px;
+    border-radius: 9px;
+  }
+
+  .bs-legend {
+    gap: 4px 9px;
+    font-size: 9.5px;
+  }
+
+  .bs-layout {
+    gap: 10px;
+  }
+
+  .bs-side {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .bs-panel {
+    width: 100%;
+  }
+
+  .bs-own-grid {
+    max-width: 230px;
+  }
+
+  .bs-last-shot {
+    font-size: 10.5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bs-cell {
+    transition: none;
+  }
+}
