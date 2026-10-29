@@ -161,6 +161,20 @@ test('GET /state：无令牌 / 错令牌 ⭢ spectator=true；正确令牌 ⭢ �
   assert.equal(mine.body.seat, 1);
   assert.ok(mine.body.legalActions.length > 0, '带对令牌要能看到自己的 legalActions');
 
+  // 令牌放请求头也认（契约里写了 X-Seat-Token，以前只写在文档里没实现）
+  const viaHeader = await request(`/api/rooms/${roomId}/state?seat=1`, {
+    headers: { 'x-seat-token': token1 },
+  });
+  assert.equal(viaHeader.status, 200);
+  assert.equal(viaHeader.body.spectator, false, 'X-Seat-Token 头必须被接受');
+  assert.equal(viaHeader.body.seat, 1);
+
+  // 头里放错令牌 → 仍旧降级旁观
+  const badHeader = await request(`/api/rooms/${roomId}/state?seat=1`, {
+    headers: { 'x-seat-token': 'f'.repeat(32) },
+  });
+  assert.equal(badHeader.body.spectator, true);
+
   // 无令牌出招 → 403 seat_token_required
   const noToken = await post(`/api/rooms/${roomId}/action`, {
     seat: 1,

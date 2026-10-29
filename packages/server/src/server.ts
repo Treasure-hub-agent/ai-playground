@@ -148,6 +148,24 @@ function readToken(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
+/**
+ * 座位令牌的三个来源，按优先级取第一个非空：
+ *   1. 请求体 `{"token": "…"}`
+ *   2. 查询串 `?token=…`
+ *   3. 请求头 `x-seat-token`（给不想把凭据写进 URL / 访问日志的客户端）
+ *
+ * 头部这条以前**只写在契约里、没实现**，导致照着文档用头的客户端一直拿到旁观视图。
+ * 现在补齐——文档承诺什么，代码就做什么。
+ */
+function tokenFrom(req: IncomingMessage, ...candidates: unknown[]): string | undefined {
+  for (const candidate of candidates) {
+    const token = readToken(candidate);
+    if (token) return token;
+  }
+  const header = req.headers['x-seat-token'];
+  return readToken(Array.isArray(header) ? header[0] : header);
+}
+
 function routeParts(pathname: string): string[] {
   return pathname.split('/').filter(Boolean);
 }
@@ -261,7 +279,7 @@ async function handleApi(
         const joined = rooms.join(
           roomId,
           parseSeat(body.seat, { required: true }),
-          readToken(body.token),
+          tokenFrom(req, body.token),
         );
         // 令牌只回给入座的这一方；summary 里没有令牌，避免顺手泄露另一座位。
         json(res, 200, {
@@ -281,7 +299,7 @@ async function handleApi(
       const seat = parseSeat(params.get('seat'), { required: false });
       try {
         // 令牌不对不报错：降级为旁观观测（spectator=true），围观是正当场景。
-        json(res, 200, rooms.observation(roomId, seat, readToken(params.get('token'))));
+        json(res, 200, rooms.observation(roomId, seat, tokenFrom(req, params.get('token'))));
       } catch (err) {
         sendError(res, err);
       }
@@ -295,7 +313,7 @@ async function handleApi(
           roomId,
           parseSeat(body.seat, { required: true }),
           (body.action ?? {}) as Record<string, unknown>,
-          readToken(body.token),
+          tokenFrom(req, body.token),
         );
         if (result.error) {
           json(res, 409, { ok: false, error: result.error, legalActions: result.legalActions ?? [] });
@@ -316,7 +334,7 @@ async function handleApi(
           roomId,
           parseSeat(body.seat, { required: true }),
           String(body.text ?? ''),
-          readToken(body.token),
+          tokenFrom(req, body.token),
         );
         json(res, 200, { ok: true, message });
       } catch (err) {

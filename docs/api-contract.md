@@ -407,7 +407,14 @@
 - `GET /state`：查询串 `?seat=0&token=<t>`
 - `POST /action` / `POST /say`：请求体里加 `"token": "<t>"`
 - `POST /join`：请求体里加 `"token": "<t>"`（重连时用；不带就等于「我是新来的」）
-- 推荐用 `X-Seat-Token` 头也可以，与请求体二选一。
+- 三种带法任选，优先级 **请求体 > 查询串 > 请求头**：
+  - 请求体 `{"token": "<t>"}`
+  - 查询串 `?token=<t>`
+  - 请求头 `X-Seat-Token: <t>`（不想把凭据写进 URL 与访问日志时用它）
+- **形状提醒**：REST 的 `/state` 直接返回观测对象本身（字段在顶层）；MCP 的
+  `playground_get_state` 包在 `structuredContent` 里。按哪个接口取，就按哪个形状解析。
+- **「自动附加令牌」只对 MCP 客户端成立**（MCP server 进程内按房间记住令牌）；
+  裸 HTTP 调用方必须每次自己带。
 
 ### 三种结果
 

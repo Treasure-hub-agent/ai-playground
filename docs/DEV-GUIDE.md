@@ -85,7 +85,7 @@ packages/web/src/
 - **两个座位互演**：REST 直接给 seat0/seat1 各提交，最快复现一局（见 scripts/e2e.ts 写法）。
 - **前端样式没生效**：确认改的是 `theme.css`（在 `main.tsx` 里 import 在 styles.css 之后），选择器权重够不够。
 - **Windows 上 pnpm 找不到**：MCP 配置里 `command` 写 `pnpm.cmd`。
-- **服务重启房间就没了**：房间只在内存（MVP 取舍），重新开一桌即可。
+- **房间「重启就没了」？先确认落盘有没有开**：默认写 `<dataDir>/rooms.json`，重启会恢复；只有 `PLAYGROUND_PERSIST=0` 或 TTL（2 小时无活动）才会消失。
 
 ---
 

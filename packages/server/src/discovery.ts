@@ -138,15 +138,29 @@ export function buildLlmsTxt(opts: DiscoveryOptions): string {
 客户端配置示例（Claude Code 风格）：
   claude mcp add --transport http ai-playground ${base}/mcp
 
+## ⚠️ 先确认 MCP 真的接上了
+
+如果你当前的工具列表里**没有 playground_ 开头的那组工具**，说明 MCP 还没接上：
+先用上面那条命令把端点加进客户端，再开始对局。
+
+**不要用 curl / PowerShell 手搓 JSON-RPC**。能跑通，但你会失去客户端侧的令牌管理，
+只能猜令牌该放哪、并反复试探接口形状——整局的时间都会耗在这上面，而人类在牌桌上等着。
+
+## ⚠️ 对局礼仪
+
+按回合出招：读到 legalActions 就出一手，然后 wait_for_turn。
+**不要写自动对局脚本把整局托管掉**——人类要的是「和你同桌玩」，不是看你把棋下完。
+
 ## 席位与令牌（第 12 轮新增，必读）
 
 - 每个座位一枚令牌：32 位小写十六进制（16 字节随机数），存在房间的 seatTokens[seat] 里。
 - 0 号位（人类）：POST /api/rooms 时生成并**预留**，响应里有 seatTokens["0"]；humanUrl 也带同一个 token。
 - 1 号位（Agent）：POST /api/rooms/{roomId}/join {"seat":1} → 响应 {ok, seat, token, ...}。**把 token 存好**，丢了就等于丢座位。
-- 之后每次请求都带令牌：
+- 之后每次请求都带令牌（三种放法任选，优先级：请求体 > 查询串 > 请求头）：
   - 读观测：GET /api/rooms/{roomId}/state?seat=1&token=<t>
   - 出招：POST /api/rooms/{roomId}/action {"seat":1,"action":{...},"token":"<t>"}
   - 说话：POST /api/rooms/{roomId}/say {"seat":1,"text":"...","token":"<t>"}
+  - 或者统一放进请求头 X-Seat-Token: <t>（不想把凭据写进 URL 与访问日志时用它）
 - 不带令牌也能读，但会**降级为旁观**：spectator=true、seat=null、legalActions=[]，只给公开信息。这是给围观朋友的正当场景，不是错误。
 - 不带令牌 / 令牌不对去出招：403 {"error":"seat_token_required"}。旁观可以看，但不能出手。
 - 座位已被占（0 号位从建桌起就预留），又拿不出原令牌：409 {"error":"seat_taken"}。
@@ -154,6 +168,10 @@ export function buildLlmsTxt(opts: DiscoveryOptions): string {
 - GET /api/rooms/{id}（summary）、GET .../log、WebSocket 事件都是公开的；summary **不会**返回令牌，别去那里找。
 
 ## 备选：直接用 REST
+
+> 形状提醒：REST 的 /state **直接返回观测对象本身**（没有外层包装，字段就在顶层）；
+> MCP 的 playground_get_state 则是结构化的 { structuredContent: {...观测} }。
+> 别拿同一个 .observation 去套两边——按哪个接口取，就按哪个形状解析。
 
 - 游戏与规则：GET ${base}/api/games
 - 开桌：POST ${base}/api/rooms  {"gameId":"grab"}  → 返回 roomId、humanUrlPath、seatTokens["0"]

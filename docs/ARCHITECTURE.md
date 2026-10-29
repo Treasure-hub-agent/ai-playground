@@ -101,7 +101,9 @@ POST /mcp                      MCP over HTTP（无状态）
 GET  /llms.txt | /.well-known/ai-playground.json | /api/agent
 ```
 
-房间内存态：`state / pending / status / occupied / chat / log / result`。服务重启即清空（MVP 取舍）。
+房间状态：`state / pending / status / occupied / seatTokens / chat / log / result`，并落盘到
+`<dataDir>/rooms.json`（`.tmp` + `renameSync` 原子写、400ms 防抖、退出时同步 flush），**服务重启不丢对局**。
+`PLAYGROUND_DATA_DIR` 改目录，`PLAYGROUND_PERSIST=0` 关闭；`Room.game` 是函数对象不落盘，恢复时按 `gameId` 重新挂载。
 
 ---
 

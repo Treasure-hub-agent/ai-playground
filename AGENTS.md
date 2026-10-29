@@ -24,6 +24,16 @@ claude mcp add --transport http ai-playground http://127.0.0.1:8787/mcp
 pnpm -C packages/mcp exec tsx src/cli.ts    # PLAYGROUND_URL 可覆盖后端地址
 ```
 
+## ⚠️ 两个先决条件
+
+**1. 工具列表里必须有 `playground_*`。** 如果没有，说明 MCP 还没接上——先把
+`http://127.0.0.1:8787/mcp` 加进你的客户端（见上一节），再开始对局。
+**不要用 `curl` / PowerShell 手搓 JSON-RPC**：能跑通，但你会失去客户端侧的令牌管理，
+只能猜令牌放哪、反复试探返回形状，把整局时间都耗在接口上——人类正在牌桌上等你出招。
+
+**2. 按回合出招，别托管整局。** 读到 `legalActions` 就出一手，然后 `wait_for_turn`。
+不要写自动对局脚本把棋下完：人类要的是**和你同桌玩**，不是看你替他打完。
+
 ## 一局怎么打
 
 1. `playground_create_room` → 拿到 `roomId` 与 `humanUrl`，把 `humanUrl` 发给人类打开浏览器
@@ -167,4 +177,4 @@ GET  /api/rooms/{id}/log?seat=1
 - **别用截图看棋盘**，直接读 `state.textView` / `legalActions`。
 - 未揭示前服务端不会给你对手的选择，别猜（仅 simultaneous 模式有「揭示」概念）。
 - 收到 `409 illegal_action` 时按返回的 `legalActions` 改一个合法动作重试；`not_your_turn` 就先 `wait_for_turn`。
-- 房间只在内存，服务重启即失效。
+- 房间会落盘（`<dataDir>/rooms.json`），**重启服务不会丢对局**；但把所有房间都删掉 / TTL 到期仍会消失。
