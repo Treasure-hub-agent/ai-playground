@@ -15,7 +15,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { getGame } from '@ai-playground/core';
-import type { Room } from './rooms.ts';
+import type { Room, WakeBinding } from './rooms.ts';
 
 /** 快照格式版本：字段含义变了就 +1，读盘时版本不符一律当空启动，不做半吊子迁移。 */
 export const PERSIST_VERSION = 1;
@@ -77,6 +77,9 @@ export function toSnapshot(room: Room): RoomSnapshot {
     // 否则重启后浏览器手里的令牌全失效，所有人都得重新入座。
     seatTokens: [room.seatTokens[0], room.seatTokens[1]],
     pending: [room.pending[0], room.pending[1]],
+    // 唤醒桥绑定必须落盘：重启后人类继续落子，还得能叫醒同一个会话。
+    // lastWakeAt / lastWakeError 是进程内运行态，刻意不落盘（重启后按「没叫过」呈现）。
+    wake: room.wake ? { sessionId: room.wake.sessionId, boundAt: room.wake.boundAt } : null,
     chat: room.chat,
     log: room.log,
     result: room.result,
@@ -84,6 +87,21 @@ export function toSnapshot(room: Room): RoomSnapshot {
     lastActivity: room.lastActivity,
     lastSayAt: room.lastSayAt,
     chatSeq: room.chatSeq,
+  };
+}
+
+/**
+ * 从快照里读唤醒绑定。磁盘上的文件可能被手改过，所以逐字段校验：
+ * 形状不对就当「没绑定」，不要把一个会抛异常的绑定装回房间。
+ */
+function readWakeBinding(value: unknown): WakeBinding | null {
+  if (!isRecord(value)) return null;
+  const sessionId = value.sessionId;
+  if (typeof sessionId !== 'string' || sessionId === '') return null;
+  const boundAt = Number(value.boundAt);
+  return {
+    sessionId,
+    boundAt: Number.isFinite(boundAt) && boundAt > 0 ? boundAt : Date.now(),
   };
 }
 
@@ -111,6 +129,9 @@ export function fromSnapshot(snapshot: RoomSnapshot): Room | null {
     occupied: [Boolean(snapshot.occupied?.[0]), Boolean(snapshot.occupied?.[1])],
     seatTokens: [snapshot.seatTokens?.[0] ?? null, snapshot.seatTokens?.[1] ?? null],
     pending: [snapshot.pending?.[0] ?? null, snapshot.pending?.[1] ?? null],
+    // 旧文件（第 14 轮之前写的）没有 wake 字段：当成「没绑定」恢复即可，
+    // 所以**不 bump PERSIST_VERSION**——一 bump 就会把主人机器上正在打的真实房间全丢。
+    wake: readWakeBinding(snapshot.wake),
     chat: Array.isArray(snapshot.chat) ? snapshot.chat : [],
     log: Array.isArray(snapshot.log) ? snapshot.log : [],
     result: snapshot.result ?? null,

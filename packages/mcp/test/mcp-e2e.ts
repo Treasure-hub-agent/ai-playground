@@ -1,7 +1,7 @@
 /**
  * MCP 协议级 E2E：用 SDK 官方 Client + InMemoryTransport 真跑 tools 与 resource。
  *
- * 覆盖：listTools（9 个工具）→ readResource(规则) → 建桌（拿 0 号位令牌）
+ * 覆盖：listTools（10 个工具）→ readResource(规则) → 建桌（拿 0 号位令牌）
  *       → 双方入座（拿各自令牌，校验令牌随 humanUrl / join 返回可见）
  *       → 读观测（带令牌，非旁观）→ 主动旁观视图文案
  *       → 未入座时 get_state 给出可读错误（不是静默旁观）
@@ -45,8 +45,9 @@ await client.connect(clientTransport);
 const tools = await client.listTools();
 const names = tools.tools.map((t) => t.name).sort();
 console.log('tools:', names.join(', '));
-assert(names.length === 9, `应有 9 个工具，实际 ${names.length}`);
+assert(names.length === 10, `应有 10 个工具，实际 ${names.length}`);
 assert(names.includes('playground_submit_action'), '缺少 submit_action');
+assert(names.includes('playground_bind_session'), '缺少 bind_session（第 14 轮唤醒桥）');
 assert(
   names.every((n) => n.startsWith('playground_')),
   '所有工具应以 playground_ 开头',
@@ -89,6 +90,22 @@ assert(
   structOf(joined0).token === room.seatTokens['0'],
   'join(0) 必须沿用建桌预发的令牌（否则 humanUrl 里的令牌失效）',
 );
+
+// 第 14 轮唤醒桥：playground_bind_session 是幂等绑定（只决定「轮到 Agent 时叫醒谁」）
+const bound = await client.callTool({
+  name: 'playground_bind_session',
+  arguments: { roomId, sessionId: 'session-mcp-e2e' },
+});
+const boundS = structOf(bound);
+assert(boundS.bound === true, 'bind_session 应返回 bound=true');
+assert(boundS.roomId === roomId, 'bind_session 应回显 roomId');
+assert(boundS.sessionId === 'session-mcp-e2e', 'bind_session 应回显 sessionId');
+assert(textOf(bound).includes('已绑定'), 'bind_session 文案应明确「已绑定」');
+const boundAgain = await client.callTool({
+  name: 'playground_bind_session',
+  arguments: { roomId, sessionId: 'session-mcp-e2e' },
+});
+assert(structOf(boundAgain).bound === true, '重复绑定应幂等成功（同一 sessionId 只刷新时间）');
 
 const state = await client.callTool({ name: 'playground_get_state', arguments: { roomId, seat: 1 } });
 const obs = structOf(state).observation;
@@ -205,4 +222,4 @@ assert(waiting.isError !== true, '超时不应标记 isError');
 
 await client.close();
 await server.close();
-console.log('\n✅ MCP 协议 E2E 通过（9 tools + resource + 席位令牌透传 + 旁观视图 + 409 结构化返回）');
+console.log('\n✅ MCP 协议 E2E 通过（10 tools + resource + 席位令牌透传 + 旁观视图 + 409 结构化返回）');

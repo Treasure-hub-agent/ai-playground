@@ -121,7 +121,7 @@ export const games: Record<string, GameSpec<any, any>> = {
 
 ### 5. 接入 UI 与 MCP
 
-- **MCP**：9 个工具是通用的，新游戏不用加工具；但规则 resource 目前只为 `grab` 注册了 `playground://games/grab/rules`，新增游戏需要在 `packages/mcp/src/index.ts` 里补一条 `registerResource`，URI 用 `playground://games/<id>/rules`。
+- **MCP**：10 个工具是通用的，新游戏不用加工具（第 14 轮的 `playground_bind_session` 是唤醒桥，与具体游戏无关）；但规则 resource 目前只为 `grab` 注册了 `playground://games/grab/rules`，新增游戏需要在 `packages/mcp/src/index.ts` 里补一条 `registerResource`，URI 用 `playground://games/<id>/rules`。
 - **UI**：当前 `packages/web` 的对局界面是《抢宝大作战》专用。新游戏需要加一个视图组件，并在大厅的游戏卡片里按 `gameId` 切换；不要引入重型依赖，保持 SVG/CSS 卡通风格。
 - 如果新游戏需要新的观测字段，先在 PR 里说明 UI 怎么用，并同步更新 `docs/api-contract.md`（这份契约是共用的，改语义要先讨论）。
 

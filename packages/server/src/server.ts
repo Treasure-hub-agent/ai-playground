@@ -5,7 +5,8 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { listGameMeta, getGameMeta } from '@ai-playground/core';
 import { createMcpServer } from '@ai-playground/mcp';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { RoomManager, SeatTakenError, SeatTokenRequiredError } from './rooms.ts';
+import { RoomManager, SeatTakenError, SeatTokenRequiredError, normalizeSessionId } from './rooms.ts';
+import { scheduleAgentTurnWake, scheduleRoomEndWake } from './wake.ts';
 import { buildDescriptor, buildLlmsTxt } from './discovery.ts';
 
 const PORT = Number(process.env.PORT ?? 8787);
@@ -17,6 +18,34 @@ process.env.PLAYGROUND_URL ??= `http://${HOST}:${PORT}`;
 const REPO_ROOT = resolve(import.meta.dirname, '../../..');
 
 const rooms = new RoomManager();
+
+/**
+ * 唤醒桥：轮到 Agent 时叫醒已绑定的 DSH 会话（第 14 轮，设计稿 §3.1）。
+ *
+ * 为什么放在这一层：触发时机全是「一次 HTTP 动作之后」（入座开局 / 落子结算 / 绑定），
+ * 只有这里能看到完整时机；rooms.ts 保持纯状态机，不掺网络。
+ * fire-and-forget：任何失败都在 wake.ts 里被吃掉，绝不冒泡成对局响应的一部分。
+ */
+function notifyAgentTurn(roomId: string): void {
+  const room = rooms.get(roomId);
+  if (!room) return;
+  scheduleAgentTurnWake(room, {
+    onResult: (id, outcome) => rooms.noteWakeResult(id, outcome),
+  });
+}
+
+/**
+ * 对局结束也唤醒一次（第 15 轮补）——主人反馈「我赢了你那边没收到消息」。
+ * 和「该你出招」分开是因为终局没有 currentSeat 可看；同房间只叫一次。
+ */
+function notifyRoomEnd(roomId: string): void {
+  const room = rooms.get(roomId);
+  if (!room) return;
+  scheduleRoomEndWake(room, {
+    onResult: (id, outcome) => rooms.noteWakeResult(id, outcome),
+  });
+}
+
 // 静态目录：仓库内开发时默认 packages/web/dist；打成 npm 包后 import.meta.dirname 落在 dist/ 里，
 // 相对路径算不到包内资源，所以允许 CLI 用 PLAYGROUND_WEB_DIST 注入绝对路径。
 const webDist = process.env.PLAYGROUND_WEB_DIST ?? resolve(import.meta.dirname, '../../web/dist');
@@ -119,7 +148,8 @@ function statusOf(err: unknown): number {
   if (err instanceof SeatTokenRequiredError) return 403;
   if (err instanceof SeatTakenError) return 409;
   const msg = String((err as Error)?.message ?? '');
-  if (/seat|文本|太快|未知游戏|JSON/.test(msg)) return 400;
+  // sessionId 是第 14 轮唤醒桥的参数：格式不对属于「参数类」400，别掉进 500。
+  if (/seat|sessionId|文本|太快|未知游戏|JSON/.test(msg)) return 400;
   if (/房间不存在/.test(msg)) return 404;
   return 500;
 }
@@ -172,7 +202,7 @@ function routeParts(pathname: string): string[] {
 
 /**
  * MCP over HTTP（Streamable HTTP，无状态）。
- * 新会话的 Agent 不用翻源码、不用配 stdio，直接连 `POST /mcp` 就能拿到 9 个工具。
+ * 新会话的 Agent 不用翻源码、不用配 stdio，直接连 `POST /mcp` 就能拿到 10 个工具。
  */
 async function handleMcpRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (req.method === 'OPTIONS') {
@@ -240,7 +270,13 @@ async function handleApi(
       return true;
     }
     try {
+      // 先校验 sessionId 再建桌：否则参数写错会留下一个没人接手的空房间。
+      const sessionId = body.sessionId === undefined ? null : normalizeSessionId(body.sessionId);
       const room = rooms.create(gameId);
+      if (sessionId !== null) rooms.bindWake(room.id, sessionId);
+      // 此刻房间还是 waiting（双方没到齐），shouldWakeAgent 会挡掉；
+      // 留着这行是为了「以后改成自动开局」时行为不用再想一遍。
+      notifyAgentTurn(room.id);
       // 0 号位令牌在建桌时已预留；人类入口把它带在 URL 里，浏览器存进 sessionStorage 后
       // 应立刻用 history.replaceState 从地址栏抹掉，免得截图 / 日志把凭据带出去。
       const humanToken = room.seatTokens[0] as string;
@@ -251,6 +287,8 @@ async function handleApi(
         agentSeat: 1,
         // 令牌的另一份副本：前端 / MCP 客户端据此保存 0 号位凭据
         seatTokens: { 0: humanToken },
+        // 建桌时顺带绑定的唤醒会话（没传就为 null，行为与加唤醒桥之前一致）。
+        wake: sessionId === null ? null : { boundSessionId: sessionId },
         rules: room.game.meta.rules,
       });
     } catch (err) {
@@ -276,11 +314,14 @@ async function handleApi(
     if (method === 'POST' && sub === 'join') {
       const body = await readBody(req);
       try {
-        const joined = rooms.join(
-          roomId,
-          parseSeat(body.seat, { required: true }),
-          tokenFrom(req, body.token),
-        );
+        const seat = parseSeat(body.seat, { required: true });
+        // sessionId 在入座**之前**校验：座位一旦占上就没有回滚一说，
+        // 不能等 join 成功、绑定时才发现参数写错。
+        const sessionId = body.sessionId === undefined ? null : normalizeSessionId(body.sessionId);
+        const joined = rooms.join(roomId, seat, tokenFrom(req, body.token));
+        if (sessionId !== null) rooms.bindWake(roomId, sessionId);
+        // 双方到齐这一刻可能正好轮到 Agent（例如先手是 Agent 的局），需要把会话叫醒。
+        notifyAgentTurn(roomId);
         // 令牌只回给入座的这一方；summary 里没有令牌，避免顺手泄露另一座位。
         json(res, 200, {
           ok: true,
@@ -290,6 +331,28 @@ async function handleApi(
         });
       } catch (err) {
         sendError(res, err);
+      }
+      return true;
+    }
+
+    // POST /api/rooms/:id/bind —— 把房间绑定到一个 DSH 会话（唤醒桥）。
+    // 只新增、不改既有路由；绑定不要求席位令牌（设计稿的唤醒链路只走本机回环），
+    // 它只决定「叫醒谁」，拿不到任何对局权限，也读不到私有观测。
+    if (method === 'POST' && sub === 'bind') {
+      const body = await readBody(req);
+      try {
+        const binding = rooms.bindWake(roomId, normalizeSessionId(body.sessionId));
+        // 绑定当下若已经轮到 Agent（人类先落了子、Agent 这才补绑），补叫一次；
+        // 同一回合 3 秒去重会挡住重复触发。
+        notifyAgentTurn(roomId);
+        json(res, 200, {
+          ok: true,
+          roomId,
+          sessionId: binding.sessionId,
+          boundAt: binding.boundAt,
+        });
+      } catch (err) {
+        sendError(res, err, { ok: false });
       }
       return true;
     }
@@ -309,15 +372,28 @@ async function handleApi(
     if (method === 'POST' && sub === 'action') {
       const body = await readBody(req);
       try {
+        const seat = parseSeat(body.seat, { required: true });
         const result = rooms.submit(
           roomId,
-          parseSeat(body.seat, { required: true }),
+          seat,
           (body.action ?? {}) as Record<string, unknown>,
           tokenFrom(req, body.token),
         );
         if (result.error) {
           json(res, 409, { ok: false, error: result.error, legalActions: result.legalActions ?? [] });
         } else {
+          // 结算后的这一刻正是「该不该叫醒 Agent」的判定点：
+          // turn 模式看 currentSeat===1；simultaneous 看人类已交、Agent 未交。
+          //
+          // 只由 **人类（seat 0）** 的动作触发：Agent 自己出招后如果仍轮到自己
+          // （快艇 roll/hold、深海命中继续、黑白棋对手被自动跳过），它本来就是醒的，
+          // 再叫一次只会往会话里多塞一条「该你了」，反而干扰它读盘。
+          //
+          // 终局例外（第 15 轮）：不管是谁下的最后一手，都要叫一次「结束了」——
+          // 人类赢了 Agent 却不知道，只能等下一个人发消息，那种体验已经踩过。
+          const after = rooms.get(roomId);
+          if (after?.status === 'ended') notifyRoomEnd(roomId);
+          else if (seat === 0) notifyAgentTurn(roomId);
           json(res, 200, { ok: true, resolved: result.resolved, events: result.events });
         }
       } catch (err) {

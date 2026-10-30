@@ -57,6 +57,7 @@ export function buildDescriptor(opts: DiscoveryOptions) {
         'playground_list_games',
         'playground_create_room',
         'playground_join_room',
+        'playground_bind_session',
         'playground_wait_for_turn',
         'playground_get_state',
         'playground_submit_action',
@@ -77,8 +78,9 @@ export function buildDescriptor(opts: DiscoveryOptions) {
       base: base + '/api',
       endpoints: {
         'GET /api/games': '游戏列表与规则全文',
-        'POST /api/rooms': '建桌（body: {"gameId":"grab"|"connect4"|"yacht"|"rps-duel"|"battleship"|"reversi"}）→ 返回 roomId、humanUrlPath、seatTokens["0"]（人类座的令牌）',
-        'POST /api/rooms/:id/join': '入座（body: {"seat":1} → 发 1 号位令牌；已有座位要带 {"seat":0,"token":"<t>"}）',
+        'POST /api/rooms': '建桌（body: {"gameId":"grab"|"connect4"|"yacht"|"rps-duel"|"battleship"|"reversi", "sessionId"?: "DSH 会话 id"}）→ 返回 roomId、humanUrlPath、seatTokens["0"]（人类座的令牌）；带 sessionId 等于建桌后立即绑定唤醒会话',
+        'POST /api/rooms/:id/join': '入座（body: {"seat":1, "sessionId"?: "DSH 会话 id"} → 发 1 号位令牌；已有座位要带 {"seat":0,"token":"<t>"}）',
+        'POST /api/rooms/:id/bind': '绑定唤醒会话（body: {"sessionId":"<DSH_SESSION_ID>"}）→ 之后轮到 Agent 时服务端主动 POST 唤醒它；幂等可改绑',
         'GET /api/rooms/:id/state?seat=1&token=<t>': '该座位观测（唯一读数出口）；不带令牌 = 旁观视图 spectator=true',
         'POST /api/rooms/:id/action':
           '提交动作，body 里带 "token"。grab: {"action":"grab","cell":[r,c]}；connect4: {"action":"drop","column":n}；yacht: {"action":"roll"} / {"action":"hold","indices":[i]} / {"action":"score","category":"..."}；rps-duel: {"action":"throw","shape":"rock"|"paper"|"scissors"}；battleship: {"action":"fire","cell":[r,c]}；reversi: {"action":"place","cell":[r,c]}',
@@ -86,6 +88,17 @@ export function buildDescriptor(opts: DiscoveryOptions) {
         'GET /api/rooms/:id/result': '结算',
         'GET /api/rooms/:id/log?seat=1': '对局日志（公开；seed 在终局后才公开，避免提前预测骰子）',
       },
+    },
+    // 唤醒桥（第 14 轮）：平台在「轮到 Agent」时主动 POST 到 DSH 插件的 /wake。
+    // 这里只描述「谁该配什么」，不含任何 secret —— secret 只走环境变量。
+    wakeBridge: {
+      bindTool: 'playground_bind_session',
+      bindVia: 'POST /api/rooms/:id/bind {"sessionId": "<DSH_SESSION_ID>"}（也可在 create_room / join_room 时直接传 sessionId）',
+      diagnostics: 'GET /api/rooms/:id 的 wake 字段：{ boundSessionId, lastWakeAt, lastWakeError }（只读）',
+      platformEnv: ['WAKE_URL（DSH 插件的 /wake 地址；不配 = 功能关闭）', 'WAKE_SECRET（与插件侧配置一致，通过 x-wake-secret 头发送）'],
+      payload: '{ roomId, sessionId, gameId, round, textView, createdAt, nonce }',
+      delivery:
+        'POST JSON + x-wake-secret；超时 2s、失败重试 1 次（间隔 500ms）；同一房间+回合 3 秒内去重、最多 2 次；对局结束时不发；失败只记服务端日志，不影响对局',
     },
     rules: {
       all: base + '/api/games',
@@ -130,8 +143,8 @@ export function buildLlmsTxt(opts: DiscoveryOptions): string {
 
 - 端点：${base}/mcp
 - 传输：Streamable HTTP（MCP 官方规范），无需在本地起 stdio 进程
-- 工具：playground_create_room / playground_join_room / playground_wait_for_turn /
-  playground_get_state / playground_submit_action / playground_say /
+- 工具：playground_create_room / playground_join_room / playground_bind_session /
+  playground_wait_for_turn / playground_get_state / playground_submit_action / playground_say /
   playground_get_result / playground_export_log / playground_list_games
 - 规则资源：playground://games/grab/rules · playground://games/connect4/rules · playground://games/yacht/rules · playground://games/rps-duel/rules · playground://games/battleship/rules · playground://games/reversi/rules
 
@@ -166,6 +179,24 @@ export function buildLlmsTxt(opts: DiscoveryOptions): string {
 - 座位已被占（0 号位从建桌起就预留），又拿不出原令牌：409 {"error":"seat_taken"}。
 - 同一个人重连时带原令牌再 join 即可（幂等，令牌不变）；0 号位令牌不能用于 1 号位，反之亦然。
 - GET /api/rooms/{id}（summary）、GET .../log、WebSocket 事件都是公开的；summary **不会**返回令牌，别去那里找。
+
+## 🔔 唤醒桥：先 bind_session，人类落子会自动叫你（第 14 轮）
+
+DSH 的会话是消息驱动的：回合结束就休眠，浏览器里的点击不会自动注入会话。
+把房间绑定到你的会话后，**轮到 Agent 时服务端会主动唤醒你**，不用自己定闹钟轮询。
+
+- 绑定（三选一，幂等，可改绑）：
+  - playground_bind_session({ roomId, sessionId })
+  - playground_create_room({ gameId, sessionId })
+  - playground_join_room({ roomId, seat: 1, sessionId })
+  - sessionId 一般就是环境变量 DSH_SESSION_ID（形如 session-xxxx）；只允许 A-Za-z0-9._:-，最长 128。
+  - 纯 REST：POST /api/rooms/{id}/bind  {"sessionId":"<DSH_SESSION_ID>"}
+- 什么时候叫：**只在你该出招时**——轮流制结算后当前行动方是你；同时暗选里人类已提交、你还没提交。
+  对局结束、还没轮到你、没绑定会话，都不会叫。
+- 叫几次：同一「房间+回合」3 秒内不重复，最多 2 次；不会托管整局，也不会替你出招。
+- 绑定只决定「叫醒谁」：不改变对局规则，也不影响席位令牌；唤醒失败只记服务端日志，不影响对局。
+- 排查：GET /api/rooms/{id} 的 wake: { boundSessionId, lastWakeAt, lastWakeError } 是只读诊断字段。
+  平台侧需要配 WAKE_URL（插件 /wake 地址）与 WAKE_SECRET；**不配 = 功能关闭**，行为与以前完全一致。
 
 ## 备选：直接用 REST
 

@@ -69,7 +69,7 @@ async function main(): Promise<void> {
 
   // ── 0. 工具 / 资源枚举 ────────────────────────────────────────────
   const tools = await client.listTools();
-  assert(tools.tools.length === 9, `应有 9 个工具，实际 ${tools.tools.length}`);
+  assert(tools.tools.length === 10, `应有 10 个工具，实际 ${tools.tools.length}`);
   const resources = await client.listResources();
   const yachtRulesUri = rulesResourceUri('yacht');
   console.log(

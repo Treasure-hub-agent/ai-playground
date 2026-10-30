@@ -6,6 +6,33 @@ import type { PersistConfig, RoomSnapshot } from './persist.ts';
 
 export type RoomStatus = 'waiting' | 'playing' | 'ended';
 
+/**
+ * 唤醒桥绑定（第 14 轮）：房间 ↔ DSH 会话。
+ * 为什么要存在房间上而不是进程内存里：绑定得跨重启活着，否则服务一重启，
+ * 人类继续落子就再也叫不醒那个会话了（房间本身是落盘恢复的）。
+ */
+export interface WakeBinding {
+  sessionId: string;
+  /** 绑定时刻（epoch ms），排查「这条绑定是什么时候来的」用。 */
+  boundAt: number;
+}
+
+/**
+ * 会话 id 形状：与插件侧（dsh-whale-game 的 /wake 校验）保持一致。
+ * 在平台入口就拦掉脏数据，别等插件返回 400 才发现是这边传错了。
+ */
+const SESSION_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
+
+/** 校验并规范化 sessionId；不合法直接抛（HTTP 层会映射成 400）。 */
+export function normalizeSessionId(value: unknown): string {
+  const id = typeof value === 'string' ? value.trim() : '';
+  if (!id) throw new Error('缺少 sessionId（通常取环境变量 DSH_SESSION_ID）');
+  if (!SESSION_ID_PATTERN.test(id)) {
+    throw new Error(`sessionId 格式不合法（只允许 A-Za-z0-9._:-，最长 128）：${JSON.stringify(value)}`);
+  }
+  return id;
+}
+
 export interface ChatMessage {
   id: number;
   seat: number;
@@ -27,6 +54,16 @@ export interface Room {
    */
   seatTokens: [string | null, string | null];
   pending: [Action | null, Action | null];
+  /** 唤醒桥绑定；null = 没绑定，此时行为与加唤醒桥之前完全一致。 */
+  wake: WakeBinding | null;
+  /**
+   * 最近一次唤醒投递尝试的时间（只读诊断，**不落盘**）。
+   * 为什么可选又刻意不持久化：它是「本次进程」的运行态，重启后按「没叫过」呈现更诚实；
+   * 用可选字段是为了让 RoomSnapshot 继续能表达「这个字段不需要存盘」。
+   */
+  lastWakeAt?: number | null;
+  /** 最近一次唤醒失败原因；成功一次就清空（只读诊断，不落盘）。null = 最近一次是成功 / 还没叫过。 */
+  lastWakeError?: string | null;
   chat: ChatMessage[];
   log: { t: number; event: GameEvent }[];
   result: { winner: number | null; scores: Record<string, number>; text: string } | null;
@@ -46,6 +83,11 @@ export interface RoomSummary {
   occupied: [boolean, boolean];
   pendingSeats: number[];
   result: { winner: number | null; scores: Record<string, number>; text: string } | null;
+  /**
+   * 唤醒桥只读诊断（第 14 轮）。只有 boundSessionId 是持久化的，
+   * lastWakeAt / lastWakeError 是本次进程的运行态；没绑定时 boundSessionId 为 null。
+   */
+  wake: { boundSessionId: string | null; lastWakeAt: number | null; lastWakeError: string | null };
 }
 
 function shortId(): string {
@@ -284,6 +326,7 @@ export class RoomManager {
       // 若等 join 时才发，任何访客一个 POST /join {seat:0} 就能抢走房主的人类座位。
       seatTokens: [createSeatToken(), null],
       pending: [null, null],
+      wake: null,
       chat: [],
       log: [],
       result: null,
@@ -364,6 +407,39 @@ export class RoomManager {
     }
   }
 
+  /**
+   * 绑定唤醒会话（第 14 轮）。幂等：同一个 sessionId 重复绑定只会刷新 boundAt。
+   *
+   * 为什么允许改绑：Agent 换会话（重开 DSH / 换 profile）是正常情况，
+   * 「最后绑的那个说了算」比报错更好用；旧会话此后不会再被叫醒。
+   */
+  bindWake(id: string, sessionId: string): WakeBinding {
+    const normalized = normalizeSessionId(sessionId);
+    const room = this.mustGet(id);
+    const binding: WakeBinding = { sessionId: normalized, boundAt: Date.now() };
+    room.wake = binding;
+    // 换绑之后旧的失败原因不再代表当前绑定的状态，清掉免得误诊。
+    room.lastWakeError = null;
+    room.lastWakeAt = null;
+    this.markDirty();
+    return binding;
+  }
+
+  /**
+   * 记一次唤醒投递结果，供 GET /api/rooms/:id 的只读诊断字段。
+   * 用 `rooms.get` 而不是 `mustGet`：唤醒是旁路，不该因为房间刚好被 TTL 清掉就
+   * 顺手延长它（更不该在唤醒链路上抛异常）。
+   */
+  noteWakeResult(
+    id: string,
+    result: { at: number } & ({ ok: true } | { ok: false; error: string }),
+  ): void {
+    const room = this.rooms.get(id);
+    if (!room) return;
+    room.lastWakeAt = result.at;
+    room.lastWakeError = result.ok ? null : result.error;
+  }
+
   /** 公开摘要：**绝不能**带令牌或 humanUrlPath，否则任意 GET 一次就能拿到座位凭据。 */
   summary(id: string): RoomSummary {
     const room = this.mustGet(id);
@@ -381,6 +457,13 @@ export class RoomManager {
       // 轮流制没有「挂起动作」这一说，恒为空，避免前端误显示「对方已提交」。
       pendingSeats: turnBased ? [] : [0, 1].filter((s) => room.pending[s] !== null),
       result: room.result,
+      // 只读诊断：不回传任何令牌；boundSessionId 本身就是 Agent 的会话 id，
+      // 设计稿明确要它出现在公开 summary 里（人类 / 排查者据此确认「绑定生效了没」）。
+      wake: {
+        boundSessionId: room.wake?.sessionId ?? null,
+        lastWakeAt: room.lastWakeAt ?? null,
+        lastWakeError: room.lastWakeError ?? null,
+      },
     };
   }
 

@@ -26,7 +26,7 @@
 | | 谁 | 做什么 |
 |---|---|---|
 | 🧑 | **你** | 在浏览器里开一桌、点格子、发气泡。不用装客户端。 |
-| 🤖 | **Agent** | Claude Code / Codex / DeepSeek Harness 或任何会调 [MCP](https://modelcontextprotocol.io) 的 Agent，通过 9 个工具入座、读棋盘、出招。 |
+| 🤖 | **Agent** | Claude Code / Codex / DeepSeek Harness 或任何会调 [MCP](https://modelcontextprotocol.io) 的 Agent，通过 10 个工具入座、读棋盘、出招。 |
 | ⚖️ | **服务器** | 只做裁判。默认只监听 `127.0.0.1`，不保存任何模型密钥，不代打、不内置 AI。 |
 
 一句话：**你带 Agent，我出牌桌。**
@@ -190,7 +190,7 @@ pnpm build            # 构建前端到 packages/web/dist
 | `packages/core` | 六个游戏内核 + 单测，零运行时依赖 |
 | `packages/server` | REST + WebSocket + 房间管理 + 座位令牌 + 落盘 |
 | `packages/web` | React + Vite 人类端（大厅 / 对局 / 结算） |
-| `packages/mcp` | MCP server（HTTP + stdio），9 个工具 + 6 个规则资源 |
+| `packages/mcp` | MCP server（HTTP + stdio），10 个工具 + 6 个规则资源 |
 | `packages/cli` | `npx ai-playground` 的入口 |
 | `docs/` | [API 契约](docs/api-contract.md) · [架构](docs/ARCHITECTURE.md) · [开发指南](docs/DEV-GUIDE.md) · [变更记录](docs/CHANGELOG.md) · 六份规则 |
 

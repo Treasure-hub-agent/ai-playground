@@ -53,6 +53,16 @@ export interface CreatedRoom {
    * 契约见 docs/design-auth-round12.md §3.2。
    */
   seatTokens?: Partial<Record<Seat, string>>;
+  /** 建桌时顺带绑定的唤醒会话（第 14 轮；没传 sessionId 时为 null / undefined）。 */
+  wake?: { boundSessionId: string } | null;
+}
+
+/** 唤醒桥绑定结果（POST /api/rooms/:id/bind）。 */
+export interface BindWakeResult {
+  ok: boolean;
+  roomId: string;
+  sessionId: string;
+  boundAt: number;
 }
 
 export interface RoomSummary {
@@ -64,6 +74,12 @@ export interface RoomSummary {
   occupied: [boolean, boolean];
   pendingSeats: number[];
   result: GameResult | null;
+  /** 唤醒桥只读诊断（第 14 轮）：没绑定时 boundSessionId 为 null。 */
+  wake?: {
+    boundSessionId: string | null;
+    lastWakeAt: number | null;
+    lastWakeError: string | null;
+  };
   humanUrlPath: string;
   /** 客户端补全的完整人类入口 */
   humanUrl: string;
@@ -537,8 +553,16 @@ export async function listGames(): Promise<GameInfo[]> {
   return Array.isArray(data.games) ? data.games : [];
 }
 
-/** 创建房间，返回 roomId / humanUrl / 规则全文，并记下 0 号位（人类）令牌。 */
-export async function createRoom(gameId = 'grab'): Promise<CreatedRoom> {
+/**
+ * 创建房间，返回 roomId / humanUrl / 规则全文，并记下 0 号位（人类）令牌。
+ *
+ * `sessionId` 是第 14 轮唤醒桥的可选参数：传了就等于建桌后立刻
+ * `bindSession(roomId, sessionId)`，之后人类每次落子、轮到 Agent 时服务端会主动叫醒它。
+ * 不传 = 行为与以前完全一致。
+ */
+export async function createRoom(gameId = 'grab', sessionId?: string): Promise<CreatedRoom> {
+  const requestBody: Record<string, unknown> = { gameId };
+  if (sessionId) requestBody.sessionId = sessionId;
   const wrap = (data: Omit<CreatedRoom, 'humanUrl'>, wipBypass: boolean): CreatedRoom => {
     const roomId = data.roomId;
     // 服务端建桌时会给人类座位预发令牌；先入库，join(0) 才能带着它做幂等复查。
@@ -551,21 +575,21 @@ export async function createRoom(gameId = 'grab'): Promise<CreatedRoom> {
   };
 
   try {
-    const data = await request<Omit<CreatedRoom, 'humanUrl'>>('POST', '/api/rooms', { gameId });
+    const data = await request<Omit<CreatedRoom, 'humanUrl'>>('POST', '/api/rooms', requestBody);
     return wrap(data, false);
   } catch (err) {
     // 开发中（wip）的游戏默认不让开桌；服务端会在 400 里带 hint，提示传 allowWip。
     // 这里做「先不带、失败后带 allowWip 重试」，这样 playable / wip 两种状态都能跑。
     if (!(err instanceof PlaygroundApiError) || err.status !== 400) throw err;
-    const body = asRecord(err.body);
-    const hint = typeof body?.hint === 'string' ? body.hint : '';
+    const errorBody = asRecord(err.body);
+    const hint = typeof errorBody?.hint === 'string' ? errorBody.hint : '';
     const looksLikeWip =
       /allowWip/i.test(hint) || /开发中|wip/i.test(`${err.message} ${hint}`);
     if (!looksLikeWip) throw err;
 
     try {
       const data = await request<Omit<CreatedRoom, 'humanUrl'>>('POST', '/api/rooms', {
-        gameId,
+        ...requestBody,
         allowWip: true,
       });
       return wrap(data, true);
@@ -593,12 +617,12 @@ export interface JoinResult extends RoomSummary {
  * 已保存令牌时会随请求带回去：座位已被自己占用时服务端要靠令牌判定「幂等成功」，
  * 否则会 409 seat_taken（令牌隔离）。
  */
-export async function joinRoom(roomId: string, seat: Seat = 1): Promise<JoinResult> {
+export async function joinRoom(roomId: string, seat: Seat = 1, sessionId?: string): Promise<JoinResult> {
   const existing = getSeatToken(roomId, seat);
   const data = await request<Omit<RoomSummary, 'humanUrl'> & { ok: boolean; token?: string }>(
     'POST',
     `/api/rooms/${encodeURIComponent(roomId)}/join`,
-    { seat, ...(existing ? { token: existing } : {}) },
+    { seat, ...(existing ? { token: existing } : {}), ...(sessionId ? { sessionId } : {}) },
   );
   if (isSeatToken(data.token)) rememberSeatToken(roomId, seat, data.token);
   // summary 已按设计去掉 humanUrlPath（否则等于广播令牌）；缺失时用本地人类令牌兜底拼。
@@ -607,6 +631,19 @@ export async function joinRoom(roomId: string, seat: Seat = 1): Promise<JoinResu
     data.humanUrlPath ??
     `/?room=${encodeURIComponent(roomId)}&seat=0${fallbackToken ? `&token=${encodeURIComponent(fallbackToken)}` : ''}`;
   return { ...data, humanUrlPath, humanUrl: absoluteUrl(humanUrlPath) };
+}
+
+/**
+ * 绑定唤醒会话（第 14 轮唤醒桥）：之后人类落子、轮到 Agent 时服务端会主动
+ * POST 到 DSH 插件的 /wake，把会话叫醒。
+ *
+ * 幂等：同一个 sessionId 重复绑定只会刷新 boundAt；换 sessionId 即改绑（最后一次说了算）。
+ * 绑定只决定「叫醒谁」，不改变对局规则，也不影响席位令牌。
+ */
+export async function bindSession(roomId: string, sessionId: string): Promise<BindWakeResult> {
+  return request<BindWakeResult>('POST', `/api/rooms/${encodeURIComponent(roomId)}/bind`, {
+    sessionId,
+  });
 }
 
 /**

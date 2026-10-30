@@ -38,6 +38,7 @@ pnpm -C packages/mcp exec tsx src/cli.ts    # PLAYGROUND_URL 可覆盖后端地�
 
 1. `playground_create_room` → 拿到 `roomId` 与 `humanUrl`，把 `humanUrl` 发给人类打开浏览器
 2. `playground_join_room(roomId, seat=1)` → **服务端会发一张 1 号位令牌**，MCP 客户端自动保存，之后的调用自动带上
+   —— 想让服务端在你该出招时自动叫醒你，就在这一步带上 `sessionId`（你的 `DSH_SESSION_ID`），或随后调 `playground_bind_session`
 3. `playground_wait_for_turn(roomId)` → 读 `textView` / `legalActions`
 4. `playground_submit_action(roomId, ...)`：grab / battleship / reversi 用 `cell=[行,列]`（battleship 0–4，reversi 0–7），connect4 用 `cell=[0,列]`，yacht / rps-duel 用 `actionJson`（见下节）
 5. 重复 3–4 直到 `status=ended`
@@ -59,6 +60,25 @@ pnpm -C packages/mcp exec tsx src/cli.ts    # PLAYGROUND_URL 可覆盖后端地�
 - **同时暗选（grab / rps-duel）**：你先提交时返回 `{resolved:false, events:[]}`；**结算事件只回给后提交的一方**。想立刻看到本回合结果，就再调一次 `wait_for_turn` / `get_state`，从 `observation.history` 读。
 - **轮流制（connect4 / yacht / battleship / reversi）**：每次提交都会立即返回 `resolved:true` 和该动作的事件，不存在「等对手也提交后才结算」。
 - `grab` 场上金币抢完即结束（剩余空格/炸弹不再进行）。
+
+### 🔔 唤醒桥：先 `bind_session`，人类落子会自动叫你（第 14 轮）
+
+DSH 的会话是消息驱动的：回合结束就休眠，浏览器里的点击不会自动注入会话。
+把房间绑定到你的会话后，**轮到 Agent 时服务端会主动唤醒你**，不用自己定闹钟轮询。
+
+- 绑定（三选一，幂等，可改绑）：
+  - `playground_bind_session({ roomId, sessionId })`
+  - `playground_create_room({ gameId, sessionId })`
+  - `playground_join_room({ roomId, seat: 1, sessionId })`
+  - `sessionId` 一般就是环境变量 `DSH_SESSION_ID`（形如 `session-xxxx`）；只允许 `A-Za-z0-9._:-`，最长 128。
+  - 纯 REST：`POST /api/rooms/{id}/bind  {"sessionId":"<DSH_SESSION_ID>"}`
+- 什么时候叫：**只在你该出招时**——轮流制结算后当前行动方是你；同时暗选里人类已提交、你还没提交。
+  对局结束、还没轮到你、没绑定会话，都不会叫。
+- 叫几次：同一「房间+回合」3 秒内不重复、最多 2 次；**只叫醒，不替你出招**，更不会托管整局。
+- 绑定只决定「叫醒谁」：不改变对局规则，也不影响席位令牌。
+- 排查：`GET /api/rooms/{id}` 的 `wake: { boundSessionId, lastWakeAt, lastWakeError }` 是只读诊断字段；
+  唤醒失败只记服务端日志，**不影响对局**。
+- 平台侧需要配 `WAKE_URL`（插件 `/wake` 地址）与 `WAKE_SECRET`；**不配 = 功能关闭**，行为与以前完全一致。
 
 ## 纯 REST 也能玩（不用 MCP）
 
@@ -178,3 +198,15 @@ GET  /api/rooms/{id}/log?seat=1
 - 未揭示前服务端不会给你对手的选择，别猜（仅 simultaneous 模式有「揭示」概念）。
 - 收到 `409 illegal_action` 时按返回的 `legalActions` 改一个合法动作重试；`not_your_turn` 就先 `wait_for_turn`。
 - 房间会落盘（`<dataDir>/rooms.json`），**重启服务不会丢对局**；但把所有房间都删掉 / TTL 到期仍会消失。
+
+### 💬 对局聊天：每手都要说话（第 15 轮）
+
+- 每次出招后顺手 `playground_say({ roomId, seat: 1, text })`（≤200 字，同座位 800ms 限流）。
+- 放嘴炮、报战况、夸夸人类都行；**只闷头下棋，人类会觉得在跟机器玩**。
+- 终局也要收个尾：赢了夸对方、输了认账，别装死。
+
+### 🏁 对局结束也会被唤醒（第 15 轮）
+
+- 平台在终局发一次 `reason: "ended"` 的唤醒，带 `resultText`（如「座位 0 获胜！…」）。
+- 收到后：`playground_get_result` 核对，然后 `playground_say` 收尾。
+- 同一房间只叫一次，不会轰炸。

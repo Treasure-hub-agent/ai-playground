@@ -13,6 +13,7 @@ import { z } from 'zod';
 
 import {
   PlaygroundApiError,
+  bindSession,
   createRoom,
   exportLog,
   getBaseUrl,
@@ -423,6 +424,16 @@ function registerTools(server: McpServer): void {
     .max(1, 'seat 只能是 0（人类）或 1（Agent）')
     .default(1)
     .describe('座位：0=人类，1=Agent（默认 1）');
+  // 唤醒桥的会话 id：形状与平台 / 插件两侧的校验保持一致，脏数据在工具层就挡掉。
+  const sessionIdRequiredSchema = z
+    .string()
+    .min(1, 'sessionId 不能为空（DSH 里通常是环境变量 DSH_SESSION_ID）')
+    .max(128, 'sessionId 最长 128 字符')
+    .regex(/^[A-Za-z0-9._:-]+$/, 'sessionId 只允许 A-Za-z0-9._:-')
+    .describe('DSH 会话 id（形如 session-…；通常取环境变量 DSH_SESSION_ID）');
+  const sessionIdSchema = sessionIdRequiredSchema
+    .optional()
+    .describe('可选：建桌 / 入座后立即绑定这个会话，等价于再调一次 playground_bind_session');
 
   registerTool(server, 
     'playground_list_games',
@@ -476,11 +487,12 @@ function registerTools(server: McpServer): void {
           .describe(
             '游戏 id：grab（抢宝）/ connect4（四子棋）/ yacht（快艇骰子）/ rps-duel（猜拳心理战）/ battleship（深海猎手）/ reversi（黑白棋），默认 grab',
           ),
+        sessionId: sessionIdSchema,
       },
     },
-    async ({ gameId }) =>
+    async ({ gameId, sessionId }) =>
       guard(async () => {
-        const room = await createRoom(gameId ?? 'grab');
+        const room = await createRoom(gameId ?? 'grab', sessionId);
         const lines = [
           '✅ 房间已创建',
           `- roomId: ${room.roomId}`,
@@ -507,6 +519,12 @@ function registerTools(server: McpServer): void {
           '',
           '注意：没有入座就拿不到令牌，get_state 只会看到旁观视图（legalActions 恒为空），也不能出招。',
           '',
+          sessionId
+            ? `🔔 已把本房间绑定到会话 ${sessionId}：之后人类落子、轮到 Agent 时服务端会自动唤醒它。`
+            : '🔔 想让服务端在你该出招时自动叫醒你（不必自己定闹钟轮询）：' +
+              '调用 playground_bind_session({ roomId, sessionId: 你的 DSH_SESSION_ID })，' +
+              '或在 create_room / join_room 时直接传 sessionId。',
+          '',
           `完整规则见 MCP 资源 ${rulesResourceUri(room.gameId)}，或本结果 structuredContent.rules。`,
         );
         if (room.wipBypass) {
@@ -526,6 +544,8 @@ function registerTools(server: McpServer): void {
           // 令牌对 Agent 透明，但结构化返回里保留，方便人类 / 调试时核对。
           seatTokens: room.seatTokens ?? null,
           wipBypass: room.wipBypass === true,
+          // 唤醒桥：建桌时传了 sessionId 才有值，null = 没绑定（行为与以前一致）。
+          wake: room.wake ?? null,
         });
       }),
   );
@@ -543,11 +563,12 @@ function registerTools(server: McpServer): void {
       inputSchema: {
         roomId: roomIdSchema,
         seat: seatSchema,
+        sessionId: sessionIdSchema,
       },
     },
-    async ({ roomId, seat }) =>
+    async ({ roomId, seat, sessionId }) =>
       guard(async () => {
-        const joined = await joinRoom(roomId, seat as Seat);
+        const joined = await joinRoom(roomId, seat as Seat, sessionId);
         const lines = [
           `✅ 已入座：roomId=${joined.roomId}，seat=${seat}（${seatName(seat)}）`,
           `席位令牌：${joined.token ?? '（服务端未返回，可能还是旧版本）'}`,
@@ -557,6 +578,9 @@ function registerTools(server: McpServer): void {
           `待提交动作的座位：${joined.pendingSeats.length > 0 ? joined.pendingSeats.join('、') : '无'}`,
           `人类入口：${joined.humanUrl}`,
         ];
+        if (joined.wake?.boundSessionId) {
+          lines.push(`🔔 唤醒桥已绑定会话：${joined.wake.boundSessionId}（轮到 Agent 时服务端会主动叫醒它）`);
+        }
         if (joined.status === 'waiting') {
           lines.push('', '下一步：把人类入口发给人类入座；双方到齐后可调用 playground_wait_for_turn 等待轮到你。');
         } else if (joined.status === 'playing') {
@@ -564,7 +588,50 @@ function registerTools(server: McpServer): void {
         } else {
           lines.push('', '对局已结束：可调用 playground_get_result 查看结算，或 playground_export_log 导出日志。');
         }
+        if (!joined.wake?.boundSessionId) {
+          lines.push(
+            '',
+            '🔔 想让服务端在你该出招时自动叫醒你：playground_bind_session({ roomId, sessionId: 你的 DSH_SESSION_ID })，' +
+              '或在 join_room 时直接传 sessionId。唤醒失败只记服务端日志，不影响对局。',
+          );
+        }
         return ok(lines.join('\n'), payload(joined));
+      }),
+  );
+
+  registerTool(server,
+    'playground_bind_session',
+    {
+      title: '绑定会话（唤醒桥）',
+      description:
+        '把房间绑定到一个 DSH 会话（sessionId 一般取环境变量 DSH_SESSION_ID）：之后人类每次落子、轮到 Agent 时，' +
+        '服务端会主动 POST 唤醒该会话，Agent 不必自己定闹钟轮询。' +
+        '也可以在 playground_create_room / playground_join_room 时直接传 sessionId，一步到位。' +
+        '绑定幂等（重复绑定只刷新时间，换 sessionId 即改绑）；它只决定「叫醒谁」，不改变对局规则，也不影响席位令牌；' +
+        '唤醒失败只记服务端日志（GET /api/rooms/{id} 的 wake 字段可查），绝不影响对局。',
+      inputSchema: {
+        roomId: roomIdSchema,
+        sessionId: sessionIdRequiredSchema,
+      },
+    },
+    async ({ roomId, sessionId }) =>
+      guard(async () => {
+        const bound = await bindSession(roomId, sessionId);
+        const lines = [
+          `✅ 已绑定唤醒会话：roomId=${bound.roomId}`,
+          `- sessionId: ${bound.sessionId}`,
+          `- boundAt: ${new Date(bound.boundAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`,
+          '',
+          '之后人类落子、轮到 Agent 时，服务端会主动唤醒这个会话（同一回合最多 2 次、间隔 ≥3 秒）。',
+          `想确认绑定是否生效：GET /api/rooms/${bound.roomId} 的 wake.boundSessionId。`,
+          '唤醒失败只记服务端日志，不影响对局；人类那边照旧可以发消息叫你。',
+        ];
+        return ok(lines.join('\n'), {
+          roomId: bound.roomId,
+          sessionId: bound.sessionId,
+          bound: true,
+          boundAt: bound.boundAt,
+        });
       }),
   );
 
@@ -1145,6 +1212,11 @@ export function createMcpServer(): McpServer {
         '席位鉴权（第 12 轮）：join_room 会返回该座位的席位令牌，客户端自动保存并附加到之后每个请求；' +
         '`seat` 参数不再代表身份，没有令牌只能看旁观视图（spectator=true、legalActions 恒为空）且不能行动。' +
         '看到 spectator=true 或 403 seat_token_required 时，重新 playground_join_room 入座即可。' +
+        '唤醒桥（第 14 轮）：想被自动叫醒就 playground_bind_session({roomId, sessionId: 你的 DSH_SESSION_ID})，' +
+        '或在 create_room / join_room 时直接传 sessionId；绑定后轮到 Agent 时服务端会主动唤醒会话（不是自动出招，仍需你自己读盘面）。' +
+        '对局结束也会唤醒一次（reason=ended，带结算文案）——人类赢了，你不该事后才知道。' +
+        '对局聊天（第 15 轮）：每一手出招后顺手 playground_say 说一句（≤200 字，同座位 800ms 限流）。' +
+        '放嘴炮、报战况、夸夸人类都行；只闷头下棋的话，人类会觉得在跟机器对局。' +
         '规则资源：playground://games/<gameId>/rules（grab / connect4 / yacht / rps-duel / battleship / reversi）。' +
         '快艇骰子（yacht）用 actionJson 提交三种动作：{"action":"roll"}、' +
         '{"action":"hold","indices":[0]}（一次只切一颗，[] 全解锁）、{"action":"score","category":"..."}（记分换手）。' +

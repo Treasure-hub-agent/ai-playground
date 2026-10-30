@@ -13,7 +13,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "test": "tsx --test test/rooms.test.ts test/http.test.ts test/persist.test.ts"
+    "test": "tsx --test test/rooms.test.ts test/http.test.ts test/persist.test.ts test/wake.test.ts"
   },
   "dependencies": {
     "@ai-playground/core": "workspace:*",

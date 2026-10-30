@@ -6,7 +6,7 @@
 Agent (MCP client)
    │  stdio（JSON-RPC / MCP）
    ▼
-packages/mcp/src/cli.ts  ──►  src/index.ts（McpServer：9 tools + 动态规则资源）
+packages/mcp/src/cli.ts  ──►  src/index.ts（McpServer：10 tools + 动态规则资源）
                                   │ HTTP
                                   ▼
                      http://127.0.0.1:8787（packages/server）
@@ -45,7 +45,7 @@ cd ai-playground   # 换成你自己的仓库路径
 # 1) HTTP 客户端冒烟：建桌 → 双方入座 → 双方提交 → reveal → say → exportLog
 pnpm -C packages/mcp exec tsx test/smoke.ts
 
-# 2) MCP 协议级 E2E：官方 Client + InMemoryTransport，跑全部 9 个工具 + 规则资源 + 409 路径
+# 2) MCP 协议级 E2E：官方 Client + InMemoryTransport，跑全部 10 个工具 + 规则资源 + 409 路径
 pnpm -C packages/mcp exec tsx test/mcp-e2e.ts
 
 # 3) 快艇骰子专项：create_room(yacht) → roll / hold / score → 换手 → must_score / ended 分支
@@ -177,8 +177,9 @@ DSH 的 MCP 客户端是插件 `@deepseek-ai/dsh-mcp-client`，配置是 **cordi
 | 工具 | 参数（默认值） | 作用 |
 |---|---|---|
 | `playground_list_games` | — | 列出可玩游戏（id / 名称 / 简介 / 规则），wip 游戏单列「开发中」 |
-| `playground_create_room` | `gameId="grab"` | 建房间；返回 `roomId`、`humanUrl`、规则与下一步提示；wip 游戏自动 allowWip 重试 |
-| `playground_join_room` | `roomId`, `seat=1` | 入座（幂等）；`seat=0` 可模拟人类 |
+| `playground_create_room` | `gameId="grab"`, `sessionId?` | 建房间；返回 `roomId`、`humanUrl`、规则与下一步提示；wip 游戏自动 allowWip 重试；带 `sessionId` 等于建桌后立即绑定唤醒会话 |
+| `playground_join_room` | `roomId`, `seat=1`, `sessionId?` | 入座（幂等）；`seat=0` 可模拟人类；带 `sessionId` 等于入座后立即绑定唤醒会话 |
+| `playground_bind_session` | `roomId`, `sessionId` | 唤醒桥：绑定 DSH 会话，轮到 Agent 时服务端主动 POST 唤醒它（幂等，可改绑） |
 | `playground_wait_for_turn` | `roomId`, `seat=1`, `timeoutSeconds=60` | 每 500ms 轮询，直到轮到你（turn 模式看 `isYourTurn`，同时暗选看 `youSubmitted`）/ 结束 / 超时；返回观测 |
 | `playground_get_state` | `roomId`, `seat=1` | 读该座位观测（唯一读数出口）：`textView`、`legalActions`、比分、`phase` 等 |
 | `playground_submit_action` | `roomId`, `seat=1`, `cell=[r,c]` 或 `actionJson` | 提交动作；409 时把 `legalActions` 放进 `structuredContent` 并提示重选 |
@@ -215,6 +216,38 @@ DSH 的 MCP 客户端是插件 `@deepseek-ai/dsh-mcp-client`，配置是 **cordi
 - 一手中只有 `score` 换手；`roll` / `hold` 后仍是你的回合。
 - `phase`：`roll` 只能掷 → `choice` 可掷/锁/记 → `must_score` 3 次掷骰用完、只能记分。
 - 13 个 `category`：`ones` `twos` `threes` `fours` `fives` `sixes` `three_kind` `four_kind` `full_house` `small_straight` `large_straight` `yacht` `chance`。
+
+### 🔔 唤醒桥：轮到 Agent 时主动叫醒会话（第 14 轮）
+
+DSH 的会话是消息驱动的：回合结束就休眠，人类在浏览器落子不会自动注入会话。
+把房间绑定到一个会话后，**轮到 Agent 时服务端会主动 POST 到 DSH 插件的 `/wake`**，
+Agent 不用自己定闹钟轮询。
+
+三种绑定方式等价（幂等，可改绑）：
+
+```json
+{ "roomId": "abc123", "sessionId": "session-2fbf0714-…" }
+```
+
+```json
+{ "gameId": "grab", "sessionId": "session-2fbf0714-…" }
+```
+
+```json
+{ "roomId": "abc123", "seat": 1, "sessionId": "session-2fbf0714-…" }
+```
+
+分别对应 `playground_bind_session` / `playground_create_room` / `playground_join_room`。
+`sessionId` 通常就是环境变量 `DSH_SESSION_ID`（只允许 `A-Za-z0-9._:-`，最长 128）。
+
+- 触发时机：轮流制结算后 `currentSeat=1`；同时暗选里人类已提交、Agent 未提交。**对局结束不发**。
+- 去重：同一「房间+回合」至少间隔 3 秒，整回合最多 2 次（只叫醒，不托管整局）。
+- 投递（平台 → 插件）：`POST $WAKE_URL`，头 `x-wake-secret`，body
+  `{ roomId, sessionId, gameId, round, textView, createdAt, nonce }`；
+  超时 2s、失败重试 1 次（间隔 500ms）；失败只记服务端日志，**不影响对局**。
+- 平台配置：`WAKE_URL` / `WAKE_SECRET`。**不配 = 功能关闭**，行为与以前完全一致。
+- 排查：`GET /api/rooms/{id}` 的 `wake: { boundSessionId, lastWakeAt, lastWakeError }`（只读）。
+- 纯 REST：`POST /api/rooms/{id}/bind  {"sessionId":"<DSH_SESSION_ID>"}`。
 
 ### 资源
 
@@ -272,8 +305,8 @@ playground_create_room
 ```
 packages/mcp/
 ├─ src/
-│  ├─ client.ts    # fetch 封装：listGames/createRoom/joinRoom/getState/submitAction/say/getResult/exportLog
-│  ├─ index.ts     # createMcpServer()：注册 9 tools + 动态规则资源；startMcpServer()
+│  ├─ client.ts    # fetch 封装：listGames/createRoom/joinRoom/bindSession/getState/submitAction/say/getResult/exportLog
+│  ├─ index.ts     # createMcpServer()：注册 10 tools + 动态规则资源；startMcpServer()
 │  └─ cli.ts       # 入口：startMcpServer()，stderr 打「已连接/等待 stdio」
 ├─ test/
 │  ├─ smoke.ts           # 直连 HTTP 客户端的 grab 冒烟（无需 MCP 客户端）

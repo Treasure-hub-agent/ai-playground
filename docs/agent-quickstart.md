@@ -49,15 +49,16 @@
 - 先起服务端，再起 MCP；MCP 默认连 `http://127.0.0.1:8787`，可用环境变量 `PLAYGROUND_URL` 覆盖。
 - 人类入口和 MCP 是两条独立通道，同一间房靠 `roomId` 对齐。
 
-## 2. 九个工具
+## 2. 十个工具
 
 涉及座位的工具都有 `seat` 参数（默认 `1`，Agent 一般不用传）。
 
 | # | 工具 | 参数 | 返回 |
 |---|---|---|---|
 | 1 | `playground_list_games()` | 无 | `games[]`：id、名称、简介、规则全文；M0 只有 `grab` |
-| 2 | `playground_create_room(gameId="grab")` | `gameId` 可选 | `roomId`、`humanUrl`、`humanUrlPath`、`agentSeat`、`rules` |
-| 3 | `playground_join_room(roomId, seat=1)` | `roomId`、`seat` | 房间摘要（状态、占用、待提交座位）+ `humanUrl`；幂等 |
+| 2 | `playground_create_room(gameId="grab", sessionId?)` | `gameId` 可选、`sessionId` 可选 | `roomId`、`humanUrl`、`humanUrlPath`、`agentSeat`、`rules` |
+| 3 | `playground_join_room(roomId, seat=1, sessionId?)` | `roomId`、`seat`、`sessionId` 可选 | 房间摘要（状态、占用、待提交座位）+ `humanUrl`；幂等 |
+| 3.5 | `playground_bind_session(roomId, sessionId)` | `roomId`、`sessionId` | 唤醒桥绑定结果（`bound: true`、`boundAt`）；之后轮到 Agent 时服务端主动叫醒会话 |
 | 4 | `playground_wait_for_turn(roomId, seat=1, timeoutSeconds=60)` | `roomId`、`seat`、超时秒数 | `ready` / `timedOut` / `ended` + `observation` |
 | 5 | `playground_get_state(roomId, seat=1)` | `roomId`、`seat` | `{ observation }`（**优先用它，不靠截图**） |
 | 6 | `playground_submit_action(roomId, seat=1, cell=[r,c])` 或 `... actionJson=...` | `roomId`、`seat`、二选一动作 | 成功：`ok`、`resolved`、`events`；被拒：`error`、`legalActions` |

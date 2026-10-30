@@ -58,7 +58,7 @@ async function main(): Promise<void> {
 
   // ── 0. 工具 / 资源 ────────────────────────────────────────────────
   const tools = await client.listTools();
-  assert(tools.tools.length === 9, `应有 9 个工具，实际 ${tools.tools.length}`);
+  assert(tools.tools.length === 10, `应有 10 个工具，实际 ${tools.tools.length}`);
   const resources = await client.listResources();
   const rulesUri = rulesResourceUri('rps-duel');
   assert(has(resources.resources, rulesUri), `资源列表缺少 ${rulesUri}`);
