@@ -434,6 +434,18 @@ function registerTools(server: McpServer): void {
   const sessionIdSchema = sessionIdRequiredSchema
     .optional()
     .describe('可选：建桌 / 入座后立即绑定这个会话，等价于再调一次 playground_bind_session');
+  /**
+   * 席位令牌回填（第 16 轮）：服务端把令牌记在**进程内存**里，游戏厅一重启就全丢，
+   * 再入座会因为「座位已归旧令牌」直接 409 seat_taken。带上自己记住的令牌就能幂等续座。
+   */
+  const seatTokenSchema = z
+    .string()
+    .regex(/^[0-9a-fA-F]{32}$/, '席位令牌是 32 位十六进制')
+    .optional()
+    .describe(
+      '可选：服务重启后用来续座的席位令牌（之前 join_room 返回过的那个）。' +
+        '服务端令牌表在内存里，厅重启 / 换进程后会丢；带上它就能幂等入座，不必换房间。',
+    );
 
   registerTool(server, 
     'playground_list_games',
@@ -559,16 +571,19 @@ function registerTools(server: McpServer): void {
         '双方都入座后房间状态变为 playing。' +
         '席位鉴权之后，`seat` 参数不再代表身份：只有拿到该座位令牌才能读私有观测 / 提交动作 / 说话。' +
         '令牌由 MCP 客户端自动保存并附加到后续请求，Agent 不需要手动传递；如果之后看到 spectator: true 或 403 seat_token_required，' +
-        '说明未入座或令牌失效，重新调用本工具入座即可。',
+        '说明未入座或令牌失效，重新调用本工具入座即可。' +
+        '⚠️ 游戏厅重启（或换进程）后，服务端的令牌表会清空且该座位仍归旧令牌：这时重新入座会 409 seat_taken，' +
+        '请把你之前拿到的令牌放进 `token` 参数再入座一次即可幂等续座。',
       inputSchema: {
         roomId: roomIdSchema,
         seat: seatSchema,
         sessionId: sessionIdSchema,
+        token: seatTokenSchema,
       },
     },
-    async ({ roomId, seat, sessionId }) =>
+    async ({ roomId, seat, sessionId, token }) =>
       guard(async () => {
-        const joined = await joinRoom(roomId, seat as Seat, sessionId);
+        const joined = await joinRoom(roomId, seat as Seat, sessionId, token);
         const lines = [
           `✅ 已入座：roomId=${joined.roomId}，seat=${seat}（${seatName(seat)}）`,
           `席位令牌：${joined.token ?? '（服务端未返回，可能还是旧版本）'}`,

@@ -616,9 +616,18 @@ export interface JoinResult extends RoomSummary {
  *
  * 已保存令牌时会随请求带回去：座位已被自己占用时服务端要靠令牌判定「幂等成功」，
  * 否则会 409 seat_taken（令牌隔离）。
+ *
+ * `tokenOverride`（第 16 轮）：服务端的令牌表在**进程内存**里，游戏厅重启就清空，
+ * 但座位仍归旧令牌 —— 这时光靠本模块的缓存（跟着 MCP 进程一起没了）救不回来。
+ * 调用方把自己记住的令牌传进来即可幂等续座。
  */
-export async function joinRoom(roomId: string, seat: Seat = 1, sessionId?: string): Promise<JoinResult> {
-  const existing = getSeatToken(roomId, seat);
+export async function joinRoom(
+  roomId: string,
+  seat: Seat = 1,
+  sessionId?: string,
+  tokenOverride?: string,
+): Promise<JoinResult> {
+  const existing = isSeatToken(tokenOverride) ? tokenOverride : getSeatToken(roomId, seat);
   const data = await request<Omit<RoomSummary, 'humanUrl'> & { ok: boolean; token?: string }>(
     'POST',
     `/api/rooms/${encodeURIComponent(roomId)}/join`,
