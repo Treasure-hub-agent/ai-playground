@@ -102,10 +102,43 @@ const wakeLog: WakeLogEntry[] = [];
 let dedupe = new WeakMap<Room, DedupeState>();
 /** 正在飞的投递：测试要「等这次唤醒彻底落定」，线上靠它避免重复请求叠加。 */
 const inFlight = new Set<Promise<void>>();
+/**
+ * 失败重试定时器（第 16 轮补）。
+ *
+ * 为什么必须有它：唤醒是「人类已经等你出手」的唯一信号。一次投递失败（插件没起、
+ * DSH 端口变了、会话不可用）如果不重试，这局就**永远卡住**——人类在浏览器前干等，
+ * Agent 睡死在会话里，双方都不会再产生新的触发点。原先「同回合最多 2 次」只在
+ * 同一次触发里有效，等于没有重试。
+ */
+const retryTimers = new WeakMap<Room, NodeJS.Timeout>();
 let warnedMissingSecret = false;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * 失败后的重试节奏（毫秒）。默认 8s / 20s / 45s：第一次给人反应时间（插件可能正在
+ * 重连），之后拉长避免刷日志。测试可用 `WAKE_RETRY_DELAYS=50,100` 覆盖。
+ */
+const DEFAULT_RETRY_DELAYS_MS = [8_000, 20_000, 45_000];
+
+function retryDelays(env: NodeJS.ProcessEnv = process.env): number[] {
+  const raw = env.WAKE_RETRY_DELAYS?.trim();
+  if (!raw) return DEFAULT_RETRY_DELAYS_MS;
+  const parsed = raw
+    .split(',')
+    .map((part) => Number(part.trim()))
+    .filter((n) => Number.isFinite(n) && n >= 0);
+  return parsed.length > 0 ? parsed : DEFAULT_RETRY_DELAYS_MS;
+}
+
+function clearRetry(room: Room): void {
+  const timer = retryTimers.get(room);
+  if (timer) {
+    clearTimeout(timer);
+    retryTimers.delete(room);
+  }
 }
 
 function describeError(error: unknown): string {
@@ -127,11 +160,21 @@ function describeError(error: unknown): string {
 export function shouldWakeAgent(room: Room): boolean {
   if (!room.wake) return false;
   if (room.status !== 'playing') return false;
-  if (room.game.meta.resolution === 'turn') {
+  const mode = room.game.meta.resolution;
+  if (mode === 'turn') {
     // currentSeat 在终局统一返回 null，所以上面那条 status 判断不是唯一保险。
+    // 覆盖了特殊规则：battleship 命中继续开炮（仍轮到自己 → 不叫）、
+    // reversi 对手无子可下被自动跳过（又轮回人类 → 不叫）。
     return (room.game.currentSeat?.(room.state) ?? null) === 1;
   }
-  return room.pending[0] !== null && room.pending[1] === null;
+  if (mode === 'simultaneous') {
+    // 双盲模式：只认「人类已提交、Agent 还没提交」——这时结算卡在 Agent 身上。
+    // 不叫的两种情况都是对的：人类还没交（该人类）、两边都交了（正在结算）。
+    return room.pending[0] !== null && room.pending[1] === null;
+  }
+  // 未知结算模式：宁可漏叫也不乱叫（将来加了新模式，这里会打一条日志提醒补规则）。
+  console.warn(`[wake] 未知的游戏结算模式「${String(mode)}」（房间 ${room.id}），跳过唤醒判定`);
+  return false;
 }
 
 function buildPayload(
@@ -291,10 +334,22 @@ function dispatchWake(
 /**
  * 触发一次「该你出招了」唤醒（fire-and-forget）：调用方**不要 await**，也不能让它影响对局。
  * 守卫全在这里：未配置 / 未绑定 / 不在 Agent 回合 / 去重窗口内，都直接返回。
+ *
+ * 第 16 轮：失败会自动退避重试（见 {@link scheduleRetry}），否则同时暗选局会永久卡死。
  */
 export function scheduleAgentTurnWake(
   room: Room,
   options: { env?: NodeJS.ProcessEnv; onResult?: (roomId: string, outcome: WakeOutcome) => void } = {},
+): void {
+  // 新触发 = 新的回合语义，之前排着的重试作废（别让旧重试在换手后乱叫）。
+  clearRetry(room);
+  attemptAgentTurnWake(room, options, 0);
+}
+
+function attemptAgentTurnWake(
+  room: Room,
+  options: { env?: NodeJS.ProcessEnv; onResult?: (roomId: string, outcome: WakeOutcome) => void },
+  attempt: number,
 ): void {
   const config = wakeConfigFromEnv(options.env);
   if (config === null) return; // 未配置 = 功能关闭，行为与今天完全一致
@@ -314,7 +369,57 @@ export function scheduleAgentTurnWake(
   if (!Number.isFinite(round)) return;
 
   const payload = buildPayload(room, round, textView, room.wake.sessionId, 'turn');
-  dispatchWake(room, config, payload, `${room.id}:${round}`, options, WAKE_MAX_PER_ROUND);
+  // 重试用的 key 带 attempt 后缀：去重表是按「同 key 3 秒 / 上限次数」记账的，
+  // 如果重试沿用同一个 key，会被「同回合最多 2 次」直接挡掉——那就等于没重试。
+  const key = attempt === 0 ? `${room.id}:${round}` : `${room.id}:${round}:retry${attempt}`;
+  const innerOnResult = options.onResult;
+  dispatchWake(
+    room,
+    config,
+    payload,
+    key,
+    {
+      onResult: (roomId, outcome) => {
+        try {
+          innerOnResult?.(roomId, outcome);
+        } catch (error) {
+          console.warn(`[wake] 记录唤醒诊断失败：${describeError(error)}`);
+        }
+        if (outcome.ok) {
+          clearRetry(room);
+          return;
+        }
+        scheduleRetry(room, options, attempt + 1);
+      },
+    },
+    WAKE_MAX_PER_ROUND,
+  );
+}
+
+/**
+ * 失败后退避重试：同一个房间只排一个定时器；每次触发前都重新判断「是否还轮到 Agent」，
+ * 已经被人类反悔 / 对局结束 / 解除绑定的房间不会再被叫。
+ */
+function scheduleRetry(
+  room: Room,
+  options: { env?: NodeJS.ProcessEnv; onResult?: (roomId: string, outcome: WakeOutcome) => void },
+  nextAttempt: number,
+): void {
+  const delays = retryDelays(options.env);
+  if (nextAttempt > delays.length) {
+    console.warn(`[wake] 房间 ${room.id} 唤醒重试 ${delays.length} 次仍失败，放弃（对局不受影响，人类可以发消息叫 Agent）`);
+    return;
+  }
+  const delay = delays[nextAttempt - 1];
+  clearRetry(room);
+  const timer = setTimeout(() => {
+    retryTimers.delete(room);
+    attemptAgentTurnWake(room, options, nextAttempt);
+  }, delay);
+  // 不要让定时器把进程吊住（测试里尤其重要）。
+  timer.unref?.();
+  retryTimers.set(room, timer);
+  console.warn(`[wake] 房间 ${room.id} 唤醒失败，${delay}ms 后重试（第 ${nextAttempt}/${delays.length} 次）`);
 }
 
 /**
@@ -328,6 +433,8 @@ export function scheduleRoomEndWake(
   room: Room,
   options: { env?: NodeJS.ProcessEnv; onResult?: (roomId: string, outcome: WakeOutcome) => void } = {},
 ): void {
+  // 终局了，之前排着的「该你出招」重试必须作废，别在结算后再叫一次。
+  clearRetry(room);
   const config = wakeConfigFromEnv(options.env);
   if (config === null) return;
   if (!room.wake) return;

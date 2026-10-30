@@ -60,6 +60,8 @@ interface ReceivedWake {
 const received: ReceivedWake[] = [];
 /** ok = 200；fail = 500（用来验证「失败重试 1 次 + 不影响对局」）。 */
 let receiverMode: 'ok' | 'fail' = 'ok';
+/** 前 N 个请求强制失败，之后恢复 receiverMode 的行为（验证退避重试）。 */
+let failRemaining = 0;
 
 const receiver = createHttpServer((req, res) => {
   let raw = '';
@@ -74,6 +76,12 @@ const receiver = createHttpServer((req, res) => {
       body = raw;
     }
     received.push({ headers: req.headers, body, at: Date.now() });
+    if (failRemaining > 0) {
+      failRemaining -= 1;
+      res.writeHead(500, { 'content-type': 'application/json' });
+      res.end('{"error":"boom-by-plan"}');
+      return;
+    }
     if (receiverMode === 'fail') {
       res.writeHead(500, { 'content-type': 'application/json' });
       res.end('{"error":"boom"}');
@@ -452,4 +460,42 @@ test('对局结束唤醒：reason=ended 且带 resultText，同一房间只叫�
     1,
     '去重上限 = 1 次',
   );
+});
+
+// ─────────────────────── 7. 失败退避重试（第 16 轮） ───────────────────────
+
+test('投递失败会退避重试：立即两次失败后按节奏重试成功，不再无限叫', async () => {
+  const savedDelays = process.env.WAKE_RETRY_DELAYS;
+  // 测试里把节奏压到 60ms，别真等 8 秒。
+  process.env.WAKE_RETRY_DELAYS = '60,120';
+  try {
+    const { roomId, token0 } = await openTable('connect4');
+    await post(`/api/rooms/${roomId}/bind`, { sessionId: 'session-retry-01' });
+    const baseline = received.length;
+
+    // 前两次（首次 + 内建重试）失败，之后的退避重试应该成功。
+    failRemaining = 2;
+    const [drop] = await legalActionsFor(roomId, 0, token0);
+    const moved = await post(`/api/rooms/${roomId}/action`, {
+      seat: 0,
+      token: token0,
+      action: humanActionGuard(drop),
+    });
+    assert.equal(moved.status, 200, '唤醒失败绝不能让对局动作失败');
+
+    await waitUntil(
+      () => received.slice(baseline).length >= 3 && wakeLogEntries().some((entry) => entry.ok),
+      4000,
+    );
+
+    const attempts = received.slice(baseline);
+    assert.ok(attempts.length >= 3, `应有至少 3 次投递（含退避重试），实际 ${attempts.length}`);
+    assert.equal(attempts[0].body.roomId, roomId);
+    const logs = wakeLogEntries();
+    assert.ok(logs.some((entry) => !entry.ok), '应记录过失败');
+    assert.ok(logs.some((entry) => entry.ok), '退避重试后应记录成功');
+  } finally {
+    failRemaining = 0;
+    process.env.WAKE_RETRY_DELAYS = savedDelays;
+  }
 });
