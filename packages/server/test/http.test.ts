@@ -263,3 +263,49 @@ test('房间不存在仍 404；/llms.txt 与 /.well-known 说明「入座拿令�
     'join 端点说明要写清会发令牌',
   );
 });
+
+// ═══════════ 第 18 轮：REST 错误体必须带中文说明（真人对局实测 P0） ═══════════
+
+test('错误体带 message/next：非法动作、非自己回合、未入座都能看懂怎么救', async () => {
+  const created = await post('/api/rooms', { gameId: 'grab' });
+  const roomId = created.body.roomId as string;
+  const token0 = created.body.seatTokens['0'] as string;
+  await post(`/api/rooms/${roomId}/join`, { seat: 0, token: token0 });
+
+  // 1) 还没开局就出招 → waiting_for_opponent + 中文说明
+  const early = await post(`/api/rooms/${roomId}/action`, {
+    seat: 0,
+    token: token0,
+    action: { action: 'grab', cell: [0, 0] },
+  });
+  assert.equal(early.status, 409);
+  assert.equal(early.body.error, 'waiting_for_opponent');
+  assert.match(String(early.body.message ?? ''), /还没到齐|尚未开始/, '必须有中文 message');
+  assert.match(String(early.body.next ?? ''), /入座|等待/, '必须给下一步');
+
+  // 2) 双方入座后：非法动作 → illegal_action + 说明 + legalActions
+  await post(`/api/rooms/${roomId}/join`, { seat: 1 });
+  const illegal = await post(`/api/rooms/${roomId}/action`, {
+    seat: 0,
+    token: token0,
+    action: { action: 'grab', cell: [9, 9] },
+  });
+  assert.equal(illegal.status, 409);
+  assert.equal(illegal.body.error, 'illegal_action');
+  assert.match(String(illegal.body.message ?? ''), /不符合规则/);
+  assert.ok(Array.isArray(illegal.body.legalActions), '非法动作仍要回带 legalActions');
+
+  // 3) 未入座就出招 → seat_not_joined + 明确让他先 join
+  const fresh = await post('/api/rooms', { gameId: 'grab' });
+  const freshId = fresh.body.roomId as string;
+  const freshToken0 = fresh.body.seatTokens['0'] as string;
+  const notJoined = await post(`/api/rooms/${freshId}/action`, {
+    seat: 0,
+    token: freshToken0,
+    action: { action: 'grab', cell: [0, 0] },
+  });
+  assert.equal(notJoined.status, 409);
+  assert.equal(notJoined.body.error, 'seat_not_joined');
+  assert.match(String(notJoined.body.message ?? ''), /还没入座/);
+  assert.match(String(notJoined.body.next ?? ''), /join/);
+});

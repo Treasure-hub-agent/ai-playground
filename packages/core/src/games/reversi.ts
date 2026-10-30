@@ -310,10 +310,12 @@ export function buildReversiTextView(state: ReversiState, seat: Seat | null): st
     lines.push(` ${r + 1}  ` + row.join(' '));
   }
   if (spectator) lines.push('图例：● = 座位 0，○ = 座位 1；旁观视图不展示可落点。');
+  else if (!ended) lines.push(`图例：● = 你（座位 ${seat}），○ = 对手，· = 你现在能落子；列 A–H、行 1–8。`);
 
   if (ended) {
     const result = reversi.result(state);
-    lines.push(`对局已结束：${result.text} 可调用 get_result / export_log。`);
+    // 这句话是给人看的，别塞 Agent 才有的工具名（人类在浏览器里没有 get_result 按钮）。
+    lines.push(`对局已结束：${result.text}（Agent 可用 get_result / export_log 复盘）`);
   } else if (spectator) {
     lines.push(`现在轮到座位 ${state.turn} 落子，旁观视图不可行动。`);
   } else if (state.turn === seat) {

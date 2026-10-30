@@ -158,11 +158,67 @@ function statusOf(err: unknown): number {
  * 错误响应体：席位鉴权类错误回稳定的机器可读 code（契约要求 error 字段就是 code），
  * 其它错误沿用中文 message，方便人类直接看懂。
  */
-function errorBody(err: unknown): { error: string } {
+/**
+ * 错误码 → 人能读懂的中文（第 18 轮，真人对局实测的 P0）。
+ *
+ * 以前 REST 只回 `{"error":"illegal_action"}`：不说哪个座位、不说怎么救。
+ * 真人模拟器第一次就卡在 `seat_not_joined`（同一时刻 state 的 legalActions 还有 7 项）。
+ * 这里给每个码配一句「发生了什么 + 下一步怎么做」，`error` 字段保持不变以兼容老客户端。
+ */
+const ERROR_EXPLANATIONS: Record<string, { message: string; next?: string }> = {
+  seat_token_required: {
+    message: '这个座位没有有效令牌，动作没有执行（令牌按座位隔离，0 号位令牌不能用于 1 号位）。',
+    next: '带上该座位的令牌重试；令牌丢了就重新入座（join），或把之前拿到的令牌放进 token 参数幂等续座。',
+  },
+  seat_taken: {
+    message: '该座位已被占用，而且你手里的令牌对不上。',
+    next: '如果你之前入座过：带原令牌再入座一次即可续座；否则请换一个房间。',
+  },
+  seat_not_joined: {
+    message: '这个座位还没入座，所以不能出招（用 humanUrl 打开会由前端自动入座；裸 REST 需要先 join）。',
+    next: '先 POST /api/rooms/{id}/join {"seat":N,"token":"<该座位令牌>"} 入座，再提交动作。',
+  },
+  waiting_for_opponent: {
+    message: '双方还没到齐，对局尚未开始。',
+    next: '等另一方入座后再出招；观察 waitingFor 字段看还缺哪个座位。',
+  },
+  not_your_turn: {
+    message: '现在不是这个座位的回合。',
+    next: '读 state 的 currentSeat / isYourTurn，轮到你了再提交。',
+  },
+  illegal_action: {
+    message: '这个动作不符合规则，没有执行。',
+    next: '按返回的 legalActions 里挑一个合法动作重试。',
+  },
+  action_already_submitted: {
+    message: '本回合你已经提交过了（同时暗选游戏每回合只能交一次）。',
+    next: '等对手提交、本回合结算后再出下一手；不要重复提交。',
+  },
+  room_ended: {
+    message: '对局已经结束了，不能再出招。',
+    next: '想看结果用 GET /api/rooms/{id}/result，复盘用 /log。',
+  },
+  room_not_found: {
+    message: '没有这个房间（可能房间号写错，或已被清理）。',
+    next: '用 playground_create_room 开新桌。',
+  },
+};
+
+/** 取某个错误码的中文说明；未知码给一句兜底，保证 message 永远存在。 */
+function explainError(code: string): { message: string; next?: string } {
+  const known = ERROR_EXPLANATIONS[code];
+  if (known) return known;
+  return { message: `操作失败：${code}（未知错误码，可查看服务端日志）` };
+}
+
+function errorBody(err: unknown): { error: string; message: string; next?: string } {
   if (err instanceof SeatTokenRequiredError || err instanceof SeatTakenError) {
-    return { error: err.code };
+    const explained = explainError(err.code);
+    // 类自带的 message 往往带房间号/座位号，信息更全，优先用它。
+    return { error: err.code, ...explained, message: err.message || explained.message };
   }
-  return { error: String((err as Error)?.message ?? err) };
+  const raw = String((err as Error)?.message ?? err);
+  return { error: raw, message: raw };
 }
 
 /** 统一发错误响应，extra 用来补 ok:false 之类的字段。 */
@@ -380,7 +436,14 @@ async function handleApi(
           tokenFrom(req, body.token),
         );
         if (result.error) {
-          json(res, 409, { ok: false, error: result.error, legalActions: result.legalActions ?? [] });
+          // 第 18 轮（真人实测）：以前只回 {"error":"illegal_action"} —— 纯英文码，
+          // 不说是谁的座位、也不说怎么救。现在补 message / next，人类与 Agent 都能直接照做。
+          json(res, 409, {
+            ok: false,
+            error: result.error,
+            ...explainError(result.error),
+            legalActions: result.legalActions ?? [],
+          });
         } else {
           // 结算后的这一刻正是「该不该叫醒 Agent」的判定点：
           // turn 模式看 currentSeat===1；simultaneous 看人类已交、Agent 未交。

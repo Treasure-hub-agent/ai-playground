@@ -180,6 +180,42 @@ function matchesLegalAction(action: Action, pattern: Action): boolean {
   return Object.keys(pattern).every((key) => key in action && deepEqual(action[key], pattern[key]));
 }
 
+/**
+ * 「喊你动手」的提示行前缀（第 18 轮）。
+ *
+ * 这些行由各游戏内核生成，在 hanging 状态（没开始 / 已交招）下必须摘掉：
+ * 留着就会出现「文案说选一个合法动作、接口说 legalActions 为空」的自相矛盾，
+ * 真人对局实测里正是这么误点了一手。
+ */
+const ACTION_HINT_RE = /^(轮到你了：|还没结束：|本局还没结算：|下一步：|可执行：)/;
+
+function stripActionHints(textView: string): string {
+  return textView
+    .split('\n')
+    .filter((line) => !ACTION_HINT_RE.test(line.trim()))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trimEnd();
+}
+
+/**
+ * 给「不能动手」的状态加一句明确的前置说明（第 18 轮）。
+ * 只改文案，不改规则：`waiting`（还没开始）与「已交招等对手」两种情形。
+ */
+function decorateTextView(
+  raw: string,
+  info: { waiting: boolean; submitted: boolean; unoccupied: number[] },
+): string {
+  if (!info.waiting && !info.submitted) return raw;
+  const body = stripActionHints(raw);
+  const banner = info.waiting
+    ? info.unoccupied.length > 0
+      ? `⏳ 还没开始：座位 ${info.unoccupied.join('、')} 还没入座，现在不能出招。`
+      : '⏳ 还没开始，现在不能出招。'
+    : '✅ 你已出手，等对手提交；本局还没结算 —— 不要再提交（重复提交会被拒）。';
+  return body ? `${banner}\n\n${body}` : banner;
+}
+
 type Listener = (roomId: string, events: GameEvent[]) => void;
 
 /** 单个 RoomManager 的落盘配置；传 `null` 表示这个实例明确不落盘。 */
@@ -498,8 +534,21 @@ export class RoomManager {
     }
 
     const obs = room.game.observe(room.state, seat);
+    const submitted = !turnBased && room.pending[seat] !== null;
+    /**
+     * 第 18 轮（真实对局实测）：`waiting` 与「已交招」这两种「你不该动手」的状态，
+     * 必须把 legalActions 清空、并把 textView 里喊你动手的提示行摘掉。
+     * 否则文案还在说「选一个合法动作」，真人会照着再点一次——那一手会被算进**下一回合**
+     *（rps-duel / grab 实测：第 2 局那次「布」就是这么来的）。
+     */
+    const blocked = !playing || submitted;
     return {
       ...obs,
+      textView: decorateTextView(String(obs.textView ?? ''), {
+        waiting: room.status === 'waiting',
+        submitted,
+        unoccupied: [0, 1].filter((s) => !room.occupied[s]),
+      }),
       roomId: room.id,
       status: room.status,
       currentSeat,
@@ -508,12 +557,13 @@ export class RoomManager {
       isYourTurn: turnBased
         ? playing && currentSeat === seat
         : playing && room.pending[seat] === null,
-      youSubmitted: turnBased ? false : room.pending[seat] !== null,
+      youSubmitted: submitted,
+      legalActions: blocked ? [] : (obs.legalActions ?? []),
       // 注意：这里**故意不回传挂起动作本身**。
       // 第 12 轮起 seat 参数不再代表身份（令牌才算），但即便拿到令牌也没必要把
       // 自己的挂起动作塞回观测里；需要"刷新后还记得自己出了什么"由客户端自己保存。
       waitingFor: !playing
-        ? []
+        ? [0, 1].filter((s) => !room.occupied[s])
         : turnBased
           ? currentSeat === null
             ? []
@@ -612,8 +662,14 @@ export class RoomManager {
     const room = this.mustGet(id);
     // 聊天也是「以某座位的身份发消息」，同样要令牌；否则旁观者能冒名挑事。
     this.assertSeatToken(room, seat, token);
-    const clean = String(text ?? '').trim().slice(0, 200);
-    if (!clean) throw new Error('空文本');
+    // 第 18 轮：超长气泡以前是**静默截断**（250 字发出去、存下来只剩 200，用户完全不知道）。
+    // 真人对局实测报了这条：改成明确拒绝，让人知道该裁剪。
+    const raw = String(text ?? '').trim();
+    if (!raw) throw new Error('空文本');
+    if (raw.length > 200) {
+      throw new Error(`文本太长：${raw.length} 字，上限 200 字（请裁剪后再发，不要指望服务端替你截断）`);
+    }
+    const clean = raw;
     const now = Date.now();
     if (now - (room.lastSayAt[seat] ?? 0) < 800) throw new Error('说话太快了，歇一下');
     room.lastSayAt[seat] = now;

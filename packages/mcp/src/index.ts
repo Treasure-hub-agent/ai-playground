@@ -384,7 +384,7 @@ function formatEvents(rawEvents: unknown[]): string[] {
       const counts = (ev.counts ?? {}) as Record<string, number>;
       lines.push(
         `⚫ 座位${ev.seat} 落子 ${cellText(ev.cell)}：翻 ${flips} 子` +
-          `（当前 ${counts['0'] ?? '?'} : ${counts['1'] ?? '?'}）`,
+          `（座位0 ${counts['0'] ?? '?'} : 座位1 ${counts['1'] ?? '?'}）`,
       );
     } else if (ev.type === 'pass') {
       lines.push(`⏭ 座位${ev.seat} 无子可下，自动跳过（仍由座位 ${ev.nextSeat} 落子）`);
@@ -1256,4 +1256,6 @@ export async function startMcpServer(): Promise<McpServer> {
   console.error(`[ai-playground-mcp] 后端地址：${getBaseUrl()}（可用 PLAYGROUND_URL 覆盖）`);
   return server;
 }
+
+
 

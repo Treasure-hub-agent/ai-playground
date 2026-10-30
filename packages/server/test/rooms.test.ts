@@ -379,11 +379,13 @@ test('聊天：say 递增 id、chat?since 过滤、同座位 800ms 限流、超�
   assert.deepEqual(manager.chat(room.id, m1.id), [m2]);
   assert.deepEqual(manager.chat(room.id, m2.id), []);
 
-  // 超长文本截断到 200 字（换一个房间，避免限流干扰）
+  // 超长文本：第 18 轮起改为**明确拒绝**（以前是静默截断到 200 字，用户完全不知道被砍了）。
   const other = newRoom();
   other.manager.join(other.room.id, 0, other.room.seatTokens[0] ?? undefined);
-  const long = other.manager.say(other.room.id, 0, '鲸'.repeat(300));
-  assert.equal(long.text.length, 200, '聊天文本应截断到 200 字');
+  assert.throws(() => other.manager.say(other.room.id, 0, '鲸'.repeat(300)), /文本太长.*200 字/);
+  // 恰好 200 字仍然可以发（边界不算超长）
+  const exact = other.manager.say(other.room.id, 0, '鲸'.repeat(200));
+  assert.equal(exact.text.length, 200, '200 字是上限，应当允许');
 });
 
 // ═════════════════════════ turn（轮流制）结算模式 ═════════════════════════
@@ -1304,3 +1306,41 @@ test('边界：0 号位只建桌未入座时，即使令牌正确也只能拿到
   assert.equal(room.pending[0], null, '未入座不能挂起动作');
 });
 
+
+// ═══════════ 第 18 轮：真人对局实测的「状态自相矛盾」回归测试 ═══════════
+
+test('未开局（waiting）：legalActions 清空、waitingFor 指出谁没入座、文案不再喊你动手', () => {
+  const { manager, room } = newRoom();
+  // 只让 0 号位入座 → 房间里 seat 1 还空着
+  manager.join(room.id, 0, room.seatTokens[0] ?? undefined);
+  const obs = manager.observation(room.id, 0, room.seatTokens[0] ?? undefined);
+
+  assert.equal(obs.status, 'waiting');
+  assert.equal(obs.isYourTurn, false, '没开局时 isYourTurn 必须是 false');
+  assert.deepEqual(obs.legalActions, [], '没开局时 legalActions 必须为空（以前会给满 7 项，真人照着点了）');
+  assert.deepEqual(obs.waitingFor, [1], 'waitingFor 应指出「1 号位还没入座」');
+  assert.match(String(obs.textView), /还没开始：座位 1 还没入座/);
+  assert.doesNotMatch(String(obs.textView), /轮到你了/, '文案里不能再出现「轮到你了」');
+});
+
+test('同时暗选已交招：legalActions 清空、youSubmitted=true、文案改「你已出手等对手」', () => {
+  const { manager, room } = newRoom();
+  joinBoth(manager, room);
+  const token0 = room.seatTokens[0] ?? undefined;
+  const before = manager.observation(room.id, 0, token0);
+  assert.ok((before.legalActions ?? []).length > 0, '开局第一手应该可行动');
+
+  const legal = before.legalActions as Array<Record<string, unknown>>;
+  manager.submit(room.id, 0, legal[0], token0);
+
+  const after = manager.observation(room.id, 0, token0);
+  assert.equal(after.youSubmitted, true);
+  assert.equal(after.isYourTurn, false, '已交招就不该再是「你的回合」');
+  assert.deepEqual(after.legalActions, [], '已交招必须清空 legalActions，否则真人会照着再点一次');
+  assert.match(String(after.textView), /你已出手，等对手提交/);
+  assert.doesNotMatch(String(after.textView), /继续选择一个合法格子/, '不能再留着「继续选择」的提示');
+
+  // 同回合重复提交：明确 409 语义（action_already_submitted），不是静默接受
+  const dup = manager.submit(room.id, 0, legal[1] ?? legal[0], token0);
+  assert.equal(dup.error, 'action_already_submitted');
+});
