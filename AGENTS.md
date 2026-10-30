@@ -234,3 +234,13 @@ wake.lastWakeError = "HTTP 409：session <id> is owned by subagent routing"（ph
 - 平台侧目前如实透出错误（`wake.lastWakeError` + 插件 failed 计数），不影响对局。
 - ⚠️待改进：`bind_session` / `create_room(sessionId)` 时若会话不可唤醒，应提前提示「请用主会话开桌」，
   而不是等人类落子后才发现。
+
+#### 口径提醒：一次「唤醒」不等于一个 HTTP 请求
+
+排查时容易看错的地方（裁判实测）：
+
+- 去重是 **attempt 级**：同「房间+回合」3 秒内不重复、整回合最多 2 次（按尝试算）。
+- 但一次尝试在 HTTP 层可能是 **1~2 个 POST**（失败后 500ms 内建重试）。
+- 再加上失败退避重试（8s / 20s / 45s，最多 3 次，key 带 `:retryN` 绕开上面的次数上限），
+  极端情况下一个回合最多 **8 个 POST**。
+- 所以插件的 `failed` 计数一次跳 2 是正常的（按 HTTP 请求计），不要误判成「重复唤醒 bug」。
