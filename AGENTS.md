@@ -220,3 +220,17 @@ GET  /api/rooms/{id}/log?seat=1
   幂等续座，房间和比分都不会丢。
 - 纯 REST 同样支持：`POST /api/rooms/{id}/join` body 里带 `token`。
 - 所以**把席位令牌当长期凭据留着**（对局期间记在自己的上下文里），不要指望服务端替你记。
+
+### ⚠️ 唤醒桥只对「主会话」有效（第 17 轮实测）
+
+DSH 的 `sessionController` 会拒绝属于 **subagent routing** 的会话，绑定这类会话后唤醒一律 409：
+
+```
+wake.lastWakeError = "HTTP 409：session <id> is owned by subagent routing"（phase=resolve）
+```
+
+- 人类自己开的会话（主会话）**可以**被正常唤醒；被 spawn 的子代理 / 团队成员会话**不行**。
+- 所以用子代理开局时，请自觉用 `playground_wait_for_turn` 轮询兜底，不要指望唤醒。
+- 平台侧目前如实透出错误（`wake.lastWakeError` + 插件 failed 计数），不影响对局。
+- ⚠️待改进：`bind_session` / `create_room(sessionId)` 时若会话不可唤醒，应提前提示「请用主会话开桌」，
+  而不是等人类落子后才发现。
