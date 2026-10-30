@@ -45,6 +45,69 @@ export function wakeConfigFromEnv(env: NodeJS.ProcessEnv = process.env): WakeCon
   return { url, secret: env.WAKE_SECRET?.trim() ?? '' };
 }
 
+/**
+ * 绑定了一个「叫不醒」的会话时抛这个错（第 18 轮）。
+ *
+ * 真实测试波里，三个 spawn 出来的测试员都被绑上了房间，平台还回「已绑定」，
+ * 直到人类落子才发现 409 —— 这次让 bind 当场失败，人类不用白等。
+ */
+export class SessionUnwakeableError extends Error {
+  readonly code = 'session-unwakeable';
+  constructor(
+    readonly sessionId: string,
+    readonly reason: string,
+  ) {
+    super(`会话 ${sessionId} 无法被唤醒：${reason}`);
+    this.name = 'SessionUnwakeableError';
+  }
+}
+
+/**
+ * 问插件「这个会话叫得动吗」（第 18 轮）：只问不投。
+ * 返回 `null` 表示「不知道」（没配 WAKE_URL / 插件没起 / 超时）—— 不拦，按老行为绑定。
+ */
+export async function probeWakeable(
+  sessionId: string,
+  options: { env?: NodeJS.ProcessEnv } = {},
+): Promise<{ wakeable: boolean | null; reason?: string }> {
+  const config = wakeConfigFromEnv(options.env);
+  if (config === null) return { wakeable: null };
+  const url = `${config.url.replace(/\/+$/, '')}/check`;
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json; charset=utf-8', 'x-wake-secret': config.secret },
+      body: JSON.stringify({ sessionId }),
+      signal: AbortSignal.timeout(1500),
+    });
+    // 响应体必须先读完再丢弃：Node fetch 的 keep-alive 需要消费完连接。
+    const text = await response.text().catch(() => '');
+    if (!response.ok) return { wakeable: null };
+    let body: unknown;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      return { wakeable: null };
+    }
+    const record = body as { wakeable?: unknown; reason?: unknown };
+    if (typeof record?.wakeable !== 'boolean') return { wakeable: null };
+    return {
+      wakeable: record.wakeable,
+      reason: typeof record.reason === 'string' ? record.reason : undefined,
+    };
+  } catch {
+    return { wakeable: null };
+  }
+}
+
+/** 绑定前的硬校验：插件明确说「叫不动」就拒绝绑定；其余情况放行。 */
+export async function assertWakeable(sessionId: string, options: { env?: NodeJS.ProcessEnv } = {}): Promise<void> {
+  const probe = await probeWakeable(sessionId, options);
+  if (probe.wakeable === false) {
+    throw new SessionUnwakeableError(sessionId, probe.reason ?? '插件报告不可唤醒');
+  }
+}
+
 /** 投递体（和插件侧约定的线上契约，字段名别改）。 */
 export interface WakePayload {
   roomId: string;

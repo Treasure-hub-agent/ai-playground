@@ -62,6 +62,8 @@ const received: ReceivedWake[] = [];
 let receiverMode: 'ok' | 'fail' = 'ok';
 /** 前 N 个请求强制失败，之后恢复 receiverMode 的行为（验证退避重试）。 */
 let failRemaining = 0;
+/** 预检（/wake/check）的应答：unwakeable 用来验「bind 当场拒绝」。 */
+let checkMode: 'ok' | 'unwakeable' = 'ok';
 
 const receiver = createHttpServer((req, res) => {
   let raw = '';
@@ -74,6 +76,13 @@ const receiver = createHttpServer((req, res) => {
       body = JSON.parse(raw);
     } catch {
       body = raw;
+    }
+    // 第 18 轮：bind 前会先打 /wake/check 做可唤醒性预检。那不是一次投递，
+    // 不能记进 received（否则去重/计数的断言全乱），这里单独应答。
+    if ((req.url ?? '').endsWith('/check')) {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(checkMode === 'ok' ? '{"ok":true,"wakeable":true}' : '{"ok":true,"wakeable":false,"reason":"session is owned by subagent routing"}');
+      return;
     }
     received.push({ headers: req.headers, body, at: Date.now() });
     if (failRemaining > 0) {
@@ -499,3 +508,40 @@ test('投递失败会退避重试：立即两次失败后按节奏重试成功�
     process.env.WAKE_RETRY_DELAYS = savedDelays;
   }
 });
+
+
+// ────────────── 第 18 轮：bind 前预检（叫不动的会话当场拒绝） ──────────────
+
+test('bind 预检：插件说「叫不动」→ 409 session-unwakeable、中文原因、且不写绑定', async () => {
+  const { roomId } = await openTable('grab');
+  checkMode = 'unwakeable';
+  try {
+    const res = await post(`/api/rooms/${roomId}/bind`, { sessionId: 'session-subagent' });
+    assert.equal(res.status, 409, `应拒绝绑定：${JSON.stringify(res.body)}`);
+    assert.equal(res.body.error, 'session-unwakeable');
+    assert.match(String(res.body.message ?? ''), /无法被唤醒|叫不醒/);
+    assert.match(String(res.body.message ?? ''), /subagent routing/, '原因要原样透出，方便排查');
+    assert.match(String(res.body.next ?? ''), /主会话|wait_for_turn/);
+
+    // 关键：拒绝之后不能留下「已绑定」的假状态
+    const summary = await request(`/api/rooms/${roomId}`);
+    assert.equal(summary.body.wake.boundSessionId, null, '预检失败不该写入绑定');
+  } finally {
+    checkMode = 'ok';
+  }
+});
+
+test('bind 预检：插件不可达时**不拦**（未知 ≠ 不可唤醒），绑定照常成功', async () => {
+  const saved = process.env.WAKE_URL;
+  // 指向一个没人监听的端口：预检必然失败 → 平台应当放行（插件可能只是还没起来）
+  process.env.WAKE_URL = 'http://127.0.0.1:9/whale-arcade/wake';
+  try {
+    const { roomId } = await openTable('grab');
+    const res = await post(`/api/rooms/${roomId}/bind`, { sessionId: 'session-unknown-01' });
+    assert.equal(res.status, 200, '探不通时应放行，不能因为插件没起就禁止绑定');
+    assert.equal(res.body.sessionId, 'session-unknown-01');
+  } finally {
+    process.env.WAKE_URL = saved;
+  }
+});
+

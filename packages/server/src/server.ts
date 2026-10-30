@@ -6,7 +6,7 @@ import { listGameMeta, getGameMeta } from '@ai-playground/core';
 import { createMcpServer } from '@ai-playground/mcp';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { RoomManager, SeatTakenError, SeatTokenRequiredError, normalizeSessionId } from './rooms.ts';
-import { scheduleAgentTurnWake, scheduleRoomEndWake } from './wake.ts';
+import { assertWakeable, scheduleAgentTurnWake, scheduleRoomEndWake, SessionUnwakeableError } from './wake.ts';
 import { buildDescriptor, buildLlmsTxt } from './discovery.ts';
 
 const PORT = Number(process.env.PORT ?? 8787);
@@ -148,6 +148,8 @@ function statusOf(err: unknown): number {
   if (err instanceof SeatTokenRequiredError) return 403;
   if (err instanceof SeatTakenError) return 409;
   const msg = String((err as Error)?.message ?? '');
+  // 第 18 轮：绑定了一个「叫不醒」的会话 —— 前提不满足，409 比 500 准确。
+  if (err instanceof SessionUnwakeableError) return 409;
   // sessionId 是第 14 轮唤醒桥的参数：格式不对属于「参数类」400，别掉进 500。
   if (/seat|sessionId|文本|太快|未知游戏|JSON/.test(msg)) return 400;
   if (/房间不存在/.test(msg)) return 404;
@@ -202,6 +204,10 @@ const ERROR_EXPLANATIONS: Record<string, { message: string; next?: string }> = {
     message: '没有这个房间（可能房间号写错，或已被清理）。',
     next: '用 playground_create_room 开新桌。',
   },
+  'session-unwakeable': {
+    message: '这个会话叫不醒（通常是子代理 / 团队成员会话，DSH 不允许外部唤醒它）。',
+    next: '改用主会话开桌（人类自己开的那个会话），或不要绑定会话、改用 wait_for_turn 轮询。',
+  },
 };
 
 /** 取某个错误码的中文说明；未知码给一句兜底，保证 message 永远存在。 */
@@ -216,6 +222,10 @@ function errorBody(err: unknown): { error: string; message: string; next?: strin
     const explained = explainError(err.code);
     // 类自带的 message 往往带房间号/座位号，信息更全，优先用它。
     return { error: err.code, ...explained, message: err.message || explained.message };
+  }
+  if (err instanceof SessionUnwakeableError) {
+    const explained = explainError(err.code);
+    return { error: err.code, message: err.message || explained.message, next: explained.next };
   }
   const raw = String((err as Error)?.message ?? err);
   return { error: raw, message: raw };
@@ -329,7 +339,11 @@ async function handleApi(
       // 先校验 sessionId 再建桌：否则参数写错会留下一个没人接手的空房间。
       const sessionId = body.sessionId === undefined ? null : normalizeSessionId(body.sessionId);
       const room = rooms.create(gameId);
-      if (sessionId !== null) rooms.bindWake(room.id, sessionId);
+      if (sessionId !== null) {
+        // 第 18 轮：绑之前先问一句「叫得动吗」，叫不动就当场拒，别等人类落子才发现。
+        await assertWakeable(sessionId);
+        rooms.bindWake(room.id, sessionId);
+      }
       // 此刻房间还是 waiting（双方没到齐），shouldWakeAgent 会挡掉；
       // 留着这行是为了「以后改成自动开局」时行为不用再想一遍。
       notifyAgentTurn(room.id);
@@ -375,7 +389,10 @@ async function handleApi(
         // 不能等 join 成功、绑定时才发现参数写错。
         const sessionId = body.sessionId === undefined ? null : normalizeSessionId(body.sessionId);
         const joined = rooms.join(roomId, seat, tokenFrom(req, body.token));
-        if (sessionId !== null) rooms.bindWake(roomId, sessionId);
+        if (sessionId !== null) {
+        await assertWakeable(sessionId);
+        rooms.bindWake(roomId, sessionId);
+      }
         // 双方到齐这一刻可能正好轮到 Agent（例如先手是 Agent 的局），需要把会话叫醒。
         notifyAgentTurn(roomId);
         // 令牌只回给入座的这一方；summary 里没有令牌，避免顺手泄露另一座位。
@@ -397,7 +414,9 @@ async function handleApi(
     if (method === 'POST' && sub === 'bind') {
       const body = await readBody(req);
       try {
-        const binding = rooms.bindWake(roomId, normalizeSessionId(body.sessionId));
+        const bindSessionId = normalizeSessionId(body.sessionId);
+        await assertWakeable(bindSessionId);
+        const binding = rooms.bindWake(roomId, bindSessionId);
         // 绑定当下若已经轮到 Agent（人类先落了子、Agent 这才补绑），补叫一次；
         // 同一回合 3 秒去重会挡住重复触发。
         notifyAgentTurn(roomId);
@@ -781,6 +800,9 @@ export function startServer(): { close: () => void; port: number } {
     },
   };
 }
+
+
+
 
 
 

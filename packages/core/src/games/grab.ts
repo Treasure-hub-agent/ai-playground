@@ -68,6 +68,14 @@ function cellToText(c: Cell): string {
   return ' 空 ';
 }
 
+/** 把坐标写成「[行,列]（A1 式字母列）」，人类读起来比裸数组快（第 18 轮）。 */
+function coordText(coord: Coord | undefined): string {
+  if (!Array.isArray(coord) || coord.length !== 2) return '（无）';
+  const [r, c] = coord;
+  const letter = 'ABC'[c] ?? '?';
+  return `[${r},${c}]（${letter}${r + 1}）`;
+}
+
 function allCoords(): Coord[] {
   const out: Coord[] = [];
   for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) out.push([r, c]);
@@ -240,11 +248,36 @@ export function buildTextView(state: GrabState, seat: Seat | null): string {
     lines.push(`第 ${r} 行: ` + row.map(cellToText).join('|'));
   });
   lines.push('坐标格式 [行,列]，例如 [0,2] 表示第 0 行第 2 列。');
+
+  // 第 18 轮（真人实测）：连续撞车时除了 history 里一个 collision:true 什么都没有，
+  // 观感像「白玩」。这里把上一回合的结果直说，撞车尤其要点明。
+  const last = played > 0 ? state.history[played - 1] : null;
+  if (last) {
+    const pickText = (s: number) => coordText(last.picks[s]);
+    const deltaOf = (s: number) => last.delta[s] ?? 0;
+    if (spectator) {
+      lines.push(
+        last.collision
+          ? `💥 上一回合撞车：座位 0 与座位 1 都抢了 ${pickText(0)}，宝物撞飞，双方 0 分。`
+          : `上一回合：座位 0 → ${pickText(0)}（${deltaOf(0) >= 0 ? '+' : ''}${deltaOf(0)}）` +
+              ` · 座位 1 → ${pickText(1)}（${deltaOf(1) >= 0 ? '+' : ''}${deltaOf(1)}）`,
+      );
+    } else {
+      const mine = last.collision ? '撞车' : deltaOf(viewer) >= 0 ? `+${deltaOf(viewer)}` : `${deltaOf(viewer)}`;
+      lines.push(
+        last.collision
+          ? `💥 上一回合撞车：你和对手都抢了 ${pickText(viewer)}，宝物撞飞，本回合双方 0 分。`
+          : `上一回合：你 → ${pickText(viewer)}（${mine}），对手 → ${pickText(opponent)}` +
+              `（${deltaOf(opponent) >= 0 ? '+' : ''}${deltaOf(opponent)}）`,
+      );
+    }
+  }
+
   if (ended) {
     const s0 = state.scores[0];
     const s1 = state.scores[1];
     const verdict = s0 === s1 ? `平局（${s0} : ${s1}）` : `${s0 > s1 ? '座位 0' : '座位 1'} 获胜（${s0} : ${s1}）`;
-    lines.push(`🏁 对局已结束：${verdict}。可调用 get_result / export_log 查看结算与复盘。`);
+    lines.push(`🏁 对局已结束：${verdict}。（Agent 可用 get_result / export_log 复盘）`);
   } else if (spectator) {
     lines.push('对局进行中：双方本回合正在同时暗选，旁观视图看不到未结算的落点。');
   } else {
@@ -254,3 +287,4 @@ export function buildTextView(state: GrabState, seat: Seat | null): string {
 }
 
 export default grab;
+
