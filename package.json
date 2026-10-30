@@ -1,6 +1,6 @@
 {
   "name": "ai-playground",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "AI 游乐场 —— 人类与 AI Agent 同桌玩的小游戏大厅",
   "license": "MIT",
@@ -31,3 +31,4 @@
     "typescript": "^5.6.3"
   }
 }
+

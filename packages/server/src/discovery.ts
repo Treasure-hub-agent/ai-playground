@@ -18,7 +18,7 @@ export function buildDescriptor(opts: DiscoveryOptions) {
     schemaVersion: 1,
     name: 'AI 游乐场',
     id: 'ai-playground',
-    version: '0.1.0',
+    version: '0.1.1',
     summary:
       '人类和 AI Agent 同桌玩的小游戏大厅：浏览器当牌桌，Agent 当对手，服务器只当裁判。当前六款可玩：抢宝大作战（grab）、四子棋（connect4）、快艇骰子（yacht）、猜拳心理战（rps-duel）、深海猎手（battleship）、黑白棋（reversi）。',
     seats: { human: 0, agent: 1 },
@@ -260,4 +260,5 @@ DSH 的会话是消息驱动的：回合结束就休眠，浏览器里的点击�
 - 机器可读版本：${base}/.well-known/ai-playground.json
 `;
 }
+
 

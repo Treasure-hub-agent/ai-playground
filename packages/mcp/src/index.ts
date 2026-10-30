@@ -31,7 +31,7 @@ import {
 } from './client.ts';
 
 export const SERVER_NAME = 'ai-playground';
-export const SERVER_VERSION = '0.1.0';
+export const SERVER_VERSION = '0.1.1';
 /** 兼容旧引用：默认（抢宝大作战）规则资源 URI。 */
 export const RULES_RESOURCE_URI = 'playground://games/grab/rules';
 /** 任意游戏的规则资源 URI。 */
@@ -1265,6 +1265,7 @@ export async function startMcpServer(): Promise<McpServer> {
   console.error(`[ai-playground-mcp] 后端地址：${getBaseUrl()}（可用 PLAYGROUND_URL 覆盖）`);
   return server;
 }
+
 
 
 
