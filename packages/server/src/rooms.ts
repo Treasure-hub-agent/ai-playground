@@ -181,18 +181,25 @@ function matchesLegalAction(action: Action, pattern: Action): boolean {
 }
 
 /**
- * 「喊你动手」的提示行前缀（第 18 轮）。
+ * 「喊你动手」的提示行（第 18 轮，第 19 轮补全）。
  *
  * 这些行由各游戏内核生成，在 hanging 状态（没开始 / 已交招）下必须摘掉：
  * 留着就会出现「文案说选一个合法动作、接口说 legalActions 为空」的自相矛盾，
  * 真人对局实测里正是这么误点了一手。
+ *
+ * 第 19 轮真人又抓到 yacht 的变体：`可执行: {"action":"roll"}（掷 5 颗骰）`、
+ * `骰子: 还没掷骰（先执行 …）`—— 所以除了前缀匹配，再补一条「包含即视为喊话」。
  */
-const ACTION_HINT_RE = /^(轮到你了：|还没结束：|本局还没结算：|下一步：|可执行：)/;
+const ACTION_HINT_RE = /^(轮到你了[：:]|还没结束[：:]|本局还没结算[：:]|下一步[：:]|可执行[：:]|骰子: 还没掷骰（先执行)/;
+const ACTION_HINT_CONTAINS_RE = /(可执行[：:]|先执行\s*\{|"action"\s*:|legalActions 为空是正常的)/;
 
 function stripActionHints(textView: string): string {
   return textView
     .split('\n')
-    .filter((line) => !ACTION_HINT_RE.test(line.trim()))
+    .filter((line) => {
+      const trimmed = line.trim();
+      return !ACTION_HINT_RE.test(trimmed) && !ACTION_HINT_CONTAINS_RE.test(trimmed);
+    })
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trimEnd();

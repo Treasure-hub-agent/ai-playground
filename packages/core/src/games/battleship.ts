@@ -414,7 +414,7 @@ export function buildBattleshipTextView(state: BattleshipState, seat: Seat | nul
         result.winner === null
           ? `平局（双方剩余舰船 ${result.scores[0]} : ${result.scores[1]}）`
           : `座位 ${result.winner} 获胜（剩余舰船 ${result.scores[0]} : ${result.scores[1]}）`;
-      lines.push(`对局已结束：${verdict}。可调用 get_result / export_log。`);
+      lines.push(`对局已结束：${verdict}。（Agent 可用 get_result / export_log 复盘）`);
     } else if (current !== null) {
       lines.push(`现在轮到座位 ${current} 开炮，旁观视图不可行动。`);
     }
@@ -478,7 +478,7 @@ export function buildBattleshipTextView(state: BattleshipState, seat: Seat | nul
 
   if (ended) {
     const result = battleship.result(state);
-    lines.push(`对局已结束：${result.text} 可调用 get_result / export_log。`);
+    lines.push(`对局已结束：${result.text}（Agent 可用 get_result / export_log 复盘）`);
   } else if (state.turn === seat) {
     lines.push('轮到你开炮：{"action":"fire","cell":[row,col]}，row/col 取 0-4。命中可继续打。');
   } else {
@@ -488,3 +488,5 @@ export function buildBattleshipTextView(state: BattleshipState, seat: Seat | nul
 }
 
 export default battleship;
+
+

@@ -360,8 +360,17 @@ function formatEvents(rawEvents: unknown[]): string[] {
         .join(' ');
       lines.push(`🎲 座位${ev.seat} 掷骰：${dice}（本手还剩 ${ev.rollsLeft} 次）`);
     } else if (ev.type === 'hold') {
-      const held = (ev.held as boolean[]).map((locked, index) => `${index}${locked ? '🔒' : ''}`).join(' ');
-      lines.push(`📌 座位${ev.seat} 锁定状态：${held}`);
+      // 第 19 轮：只回「0🔒 1 2🔒」是不够的 —— 真人实测把 5-3-5 当成三颗 5 锁了，直接亏一手。
+      // 现在带上骰面：`[5*] [3] [5*] [6] [5*]`。
+      const heldArr = Array.isArray(ev.held) ? (ev.held as boolean[]) : [];
+      const dice = Array.isArray(ev.dice) ? (ev.dice as number[]) : null;
+      if (dice) {
+        const faces = dice.map((face, i) => (heldArr[i] ? `[${face}*]` : `[${face}]`)).join(' ');
+        lines.push(`📌 座位${ev.seat} 锁定：${faces}   （* = 已锁定，共 ${heldArr.filter(Boolean).length} 颗）`);
+      } else {
+        const held = heldArr.map((locked, index) => `${index}${locked ? '🔒' : ''}`).join(' ');
+        lines.push(`📌 座位${ev.seat} 锁定状态：${held}`);
+      }
     } else if (ev.type === 'score') {
       const nextText = ev.nextSeat === null ? '（终局）' : `，换座位 ${ev.nextSeat}`;
       lines.push(`📝 座位${ev.seat} 记「${categoryLabel(ev.category)}」得 ${ev.gained} 分${nextText}`);

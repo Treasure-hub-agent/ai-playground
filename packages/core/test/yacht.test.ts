@@ -219,7 +219,10 @@ test('掷骰：只重掷未锁定的骰，rollsLeft 递减、phase 变 choice，
     type: 'hold',
     seat: 0,
     held: [true, false, true, false, false],
+    // 第 19 轮：回执带上骰面，客户端才能渲染 `[5*] [3] [5*]`（真人实测不看骰面会锁错）
+    dice: heldResult.state.dice,
   });
+  assert.equal(heldResult.events[0].dice?.length, 5, 'hold 事件必须带 5 颗骰面');
 
   const second = roll(heldResult.state);
   assert.equal(second.state.dice[0], beforeSecond[0], '锁定的骰必须保持不变');

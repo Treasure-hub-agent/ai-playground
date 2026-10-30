@@ -377,10 +377,15 @@ export function buildYachtTextView(state: YachtState, seat: Seat | null): string
 
   const turnNote = ended ? '对局结束' : spectator ? `轮到座位 ${current}` : current === seat ? '轮到你了' : `轮到座位 ${current}`;
   lines.push(
-    `${spectator ? '旁观视图 · ' : ''}快艇骰子 · 第 ${hand}/${YACHT_ROUNDS_TOTAL} 手 · 剩 ${state.rollsLeft} 次掷骰 · ${turnNote}`,
+    `${spectator ? '旁观视图 · ' : ''}快艇骰子 · ${ended ? `共 ${YACHT_ROUNDS_TOTAL} 手` : `第 ${hand}/${YACHT_ROUNDS_TOTAL} 手`}` +
+      `${ended ? '' : ` · 剩 ${state.rollsLeft} 次掷骰`} · ${turnNote}`,
   );
 
-  if (hasRolled(state)) {
+  // 第 19 轮（真人实测）：终局后 state 会被复位成「新一手的初始态」（dice 空、rollsLeft=3），
+  // 以前这里照旧打印「先执行 roll」，同一屏又写着「对局结束」，互相打脸。
+  if (ended) {
+    lines.push('骰子: —（本局已结束，不再掷骰）');
+  } else if (hasRolled(state)) {
     const faces = state.dice.map((face, index) => (state.held[index] ? `[${face}*]` : `[${face}]`));
     lines.push(`骰子: ${faces.join(' ')}   （* = 已锁定）`);
   } else {
@@ -388,7 +393,7 @@ export function buildYachtTextView(state: YachtState, seat: Seat | null): string
   }
 
   // 记分预览是「当前行动方」的私有辅助：旁观者拿到的 previewScores 全为 null，这里也不展示。
-  if (seat !== null) {
+  if (seat !== null && !ended) {
     const preview = buildPreview(state, seat);
     const cell = (category: Category): string => {
       const label = CATEGORY_LABELS[category];
@@ -589,7 +594,8 @@ function doHold(
   if (raw.length === 0) {
     const cleared = Array<boolean>(DICE_COUNT).fill(false);
     const next: YachtState = { ...state, held: cleared };
-    return { state: next, events: [{ type: 'hold', seat, held: [...cleared] }] };
+    // 回执必须带骰面（第 19 轮）：只回锁定状态的话，人/Agent 会把 5-3-5 当成三颗 5（真人实测亏分）。
+    return { state: next, events: [{ type: 'hold', seat, held: [...cleared], dice: [...next.dice] }] };
   }
   const held = [...state.held];
   for (const item of raw) {
@@ -600,7 +606,7 @@ function doHold(
     held[index] = !held[index];
   }
   const next: YachtState = { ...state, held };
-  const events: GameEvent[] = [{ type: 'hold', seat, held: [...held] }];
+  const events: GameEvent[] = [{ type: 'hold', seat, held: [...held], dice: [...state.dice] }];
   return { state: next, events };
 }
 
@@ -655,4 +661,5 @@ function doScore(
 }
 
 export default yacht;
+
 
